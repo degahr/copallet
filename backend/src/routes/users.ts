@@ -51,4 +51,57 @@ router.get('/documents', requireVerified, asyncHandler(async (req, res) => {
   res.json({ message: 'Get user documents - TODO' });
 }));
 
+// Company Profile routes
+// GET /api/users/company-profile
+router.get('/company-profile', requireVerified, asyncHandler(async (req, res) => {
+  const user = req.user!;
+  const profile = getUserProfile(user.userId);
+  
+  res.json({ 
+    profile: {
+      company: profile?.companyName || '',
+      vatNumber: profile?.vatNumber || '',
+      website: '',
+      description: '',
+      industry: '',
+      employeeCount: '',
+      foundedYear: '',
+      logoUrl: '',
+      socialMedia: {
+        linkedin: '',
+        twitter: '',
+        facebook: ''
+      },
+      address: profile?.billingAddress || {
+        street: '',
+        city: '',
+        postalCode: '',
+        country: 'Netherlands'
+      }
+    }
+  });
+}));
+
+// PUT /api/users/company-profile
+router.put('/company-profile', requireVerified, asyncHandler(async (req, res) => {
+  const user = req.user!;
+  const validatedData = UpdateProfileRequestSchema.parse(req.body);
+  
+  const updatedProfile = updateUserProfile(user.userId, validatedData);
+  
+  res.json({
+    message: 'Company profile updated successfully',
+    profile: updatedProfile
+  });
+}));
+
+// POST /api/users/company-logo
+router.post('/company-logo', requireVerified, asyncHandler(async (req, res) => {
+  // TODO: Implement logo upload
+  res.json({ 
+    message: 'Logo upload - TODO',
+    logoUrl: 'https://via.placeholder.com/200x200?text=Logo'
+  });
+}));
+
 export default router;

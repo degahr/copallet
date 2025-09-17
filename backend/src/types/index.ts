@@ -232,6 +232,47 @@ export const AutoBidRuleSchema = z.object({
   updatedAt: z.date(),
 });
 
+// Blog post types
+export const BlogPostSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  slug: z.string(),
+  content: z.string(),
+  excerpt: z.string().optional(),
+  author: z.string(),
+  authorBio: z.string().optional(),
+  authorImage: z.string().optional(),
+  date: z.date(),
+  category: z.string(),
+  readTime: z.string().optional(),
+  image: z.string().optional(),
+  featured: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+  status: z.enum(['draft', 'published', 'scheduled']).default('draft'),
+  scheduledAt: z.date().optional(),
+  publishedAt: z.date().optional(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export const CreateBlogPostSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(1),
+  excerpt: z.string().optional(),
+  author: z.string().min(1),
+  authorBio: z.string().optional(),
+  authorImage: z.string().optional(),
+  category: z.string().min(1),
+  readTime: z.string().optional(),
+  image: z.string().optional(),
+  featured: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+  status: z.enum(['draft', 'published', 'scheduled']).default('draft'),
+  scheduledAt: z.date().optional(),
+});
+
+export const UpdateBlogPostSchema = CreateBlogPostSchema.partial();
+
 // Rating types
 export const RatingSchema = z.object({
   id: z.string().uuid(),

@@ -132,10 +132,12 @@ export interface CarrierCostModel {
 export interface TrackingPoint {
   id: string;
   shipmentId: string;
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
   timestamp: Date;
   accuracy?: number;
+  speed?: number;
+  heading?: number;
 }
 
 export interface POD {

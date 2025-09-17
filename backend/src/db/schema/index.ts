@@ -236,6 +236,34 @@ export const auditLogs = pgTable('audit_logs', {
   actionIdx: index('audit_logs_action_idx').on(table.action),
 }));
 
+// Blog posts table
+export const blogPosts = pgTable('blog_posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+  content: text('content').notNull(),
+  excerpt: text('excerpt'),
+  author: varchar('author', { length: 100 }).notNull(),
+  authorBio: text('author_bio'),
+  authorImage: varchar('author_image', { length: 500 }),
+  date: timestamp('date').defaultNow().notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  readTime: varchar('read_time', { length: 20 }),
+  image: varchar('image', { length: 500 }),
+  featured: boolean('featured').default(false),
+  tags: jsonb('tags'), // Array of strings
+  status: varchar('status', { length: 20 }).notNull().default('draft'), // 'draft', 'published', 'scheduled'
+  scheduledAt: timestamp('scheduled_at'),
+  publishedAt: timestamp('published_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index('blog_posts_slug_idx').on(table.slug),
+  statusIdx: index('blog_posts_status_idx').on(table.status),
+  categoryIdx: index('blog_posts_category_idx').on(table.category),
+  publishedAtIdx: index('blog_posts_published_at_idx').on(table.publishedAt),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {

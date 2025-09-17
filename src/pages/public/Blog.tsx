@@ -1,77 +1,80 @@
 import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, Tag } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import CompanyHeader from '../../components/layout/CompanyHeader';
 import CompanyFooter from '../../components/layout/CompanyFooter';
+import apiService from '../../services/api';
+
+interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  author: string;
+  date: string;
+  category: string;
+  readTime: string;
+  image: string;
+  featured: boolean;
+  tags: string[];
+}
 
 const Blog = () => {
-  const blogPosts = [
-    {
-      id: 1,
-      title: "The Future of Pallet Freight: Digital Transformation in Logistics",
-      excerpt: "Discover how digital platforms are revolutionizing the pallet freight industry, making shipping more efficient and cost-effective for businesses of all sizes.",
-      author: "Sarah Johnson",
-      date: "2024-01-15",
-      category: "Industry Insights",
-      readTime: "5 min read",
-      image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&h=300&fit=crop",
-      featured: true
-    },
-    {
-      id: 2,
-      title: "How to Choose the Right Carrier for Your Shipments",
-      excerpt: "Learn the key factors to consider when selecting a carrier, from pricing and reliability to specialized services and coverage areas.",
-      author: "Mike Chen",
-      date: "2024-01-10",
-      category: "Shipping Tips",
-      readTime: "4 min read",
-      image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=500&h=300&fit=crop",
-      featured: false
-    },
-    {
-      id: 3,
-      title: "Cost Optimization Strategies for Pallet Shipping",
-      excerpt: "Explore proven strategies to reduce your pallet shipping costs while maintaining service quality and delivery reliability.",
-      author: "Emma Davis",
-      date: "2024-01-05",
-      category: "Cost Management",
-      readTime: "6 min read",
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=300&fit=crop",
-      featured: false
-    },
-    {
-      id: 4,
-      title: "Understanding ADR Regulations for Dangerous Goods",
-      excerpt: "A comprehensive guide to ADR regulations for shipping dangerous goods across Europe, including requirements and best practices.",
-      author: "David Wilson",
-      date: "2024-01-01",
-      category: "Compliance",
-      readTime: "8 min read",
-      image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&h=300&fit=crop",
-      featured: false
-    },
-    {
-      id: 5,
-      title: "The Rise of Sustainable Logistics: Green Shipping Solutions",
-      excerpt: "How the logistics industry is embracing sustainability through green shipping solutions and eco-friendly practices.",
-      author: "Lisa Brown",
-      date: "2023-12-28",
-      category: "Sustainability",
-      readTime: "7 min read",
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=300&fit=crop",
-      featured: false
-    },
-    {
-      id: 6,
-      title: "Technology Trends Shaping the Future of Freight",
-      excerpt: "From AI-powered route optimization to blockchain tracking, discover the technologies transforming freight and logistics.",
-      author: "Alex Rodriguez",
-      date: "2023-12-20",
-      category: "Technology",
-      readTime: "6 min read",
-      image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=500&h=300&fit=crop",
-      featured: false
-    }
-  ];
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchBlogPosts = async () => {
+      try {
+        const posts = await apiService.getBlogPosts();
+        setBlogPosts(posts);
+      } catch (err) {
+        setError('Failed to load blog posts');
+        console.error('Error fetching blog posts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBlogPosts();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <CompanyHeader />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+        <CompanyFooter />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white">
+        <CompanyHeader />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Error Loading Blog</h1>
+            <p className="text-gray-600 mb-8">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+        <CompanyFooter />
+      </div>
+    );
+  }
+
 
   const categories = ["All", "Industry Insights", "Shipping Tips", "Cost Management", "Compliance", "Sustainability", "Technology"];
 
@@ -150,7 +153,7 @@ const Blog = () => {
                         </div>
                       </div>
                       <Link
-                        to={`/blog/${post.id}`}
+                        to={`/blog/${post.slug}`}
                         className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
                       >
                         Read More
@@ -196,7 +199,7 @@ const Blog = () => {
                         </div>
                       </div>
                       <Link
-                        to={`/blog/${post.id}`}
+                        to={`/blog/${post.slug}`}
                         className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
                         Read More

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Shipment, Bid, TrackingPoint, POD, Message } from '../types';
+import { useAuth } from './AuthContext';
 import apiService from '../services/api';
 
 interface ShipmentContextType {
@@ -35,6 +36,7 @@ interface ShipmentProviderProps {
 }
 
 export const ShipmentProvider: React.FC<ShipmentProviderProps> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
   const [trackingPoints, setTrackingPoints] = useState<TrackingPoint[]>([]);
@@ -43,6 +45,12 @@ export const ShipmentProvider: React.FC<ShipmentProviderProps> = ({ children }) 
   const [loading, setLoading] = useState(false);
 
   const loadShipments = async () => {
+    if (!user) {
+      setShipments([]);
+      setBids([]);
+      return;
+    }
+    
     try {
       setLoading(true);
       const response = await apiService.request('/shipments');
@@ -55,8 +63,10 @@ export const ShipmentProvider: React.FC<ShipmentProviderProps> = ({ children }) 
   };
 
   useEffect(() => {
-    loadShipments();
-  }, []);
+    if (!authLoading) {
+      loadShipments();
+    }
+  }, [user, authLoading]);
 
   const createShipment = async (shipmentData: Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {

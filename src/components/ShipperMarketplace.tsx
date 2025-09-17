@@ -13,6 +13,8 @@ import {
   Shield,
   Award
 } from 'lucide-react';
+import QuoteRequestModal from './QuoteRequestModal';
+import ChatModal from './ChatModal';
 
 interface Carrier {
   id: string;
@@ -59,6 +61,9 @@ const ShipperMarketplace: React.FC = () => {
   });
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCarrier, setSelectedCarrier] = useState<Carrier | null>(null);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
 
   React.useEffect(() => {
     const fetchCarriers = async () => {
@@ -183,9 +188,20 @@ const ShipperMarketplace: React.FC = () => {
     });
   }, [carriers, searchTerm, filters]);
 
-  const handleRequestQuote = (carrierId: string) => {
-    // In a real app, this would open a modal or navigate to a quote request form
-    alert(`Requesting quote from carrier ${carrierId}. This would open a quote request form.`);
+  const handleRequestQuote = (carrier: Carrier) => {
+    setSelectedCarrier(carrier);
+    setShowQuoteModal(true);
+  };
+
+  const handleStartChat = (carrier: Carrier) => {
+    setSelectedCarrier(carrier);
+    setShowChatModal(true);
+  };
+
+  const handleQuoteSubmit = async (quoteData: any) => {
+    // In a real app, this would send the quote request to the backend
+    console.log('Quote request submitted:', quoteData);
+    // You could show a success message here
   };
 
   if (loading) {
@@ -454,13 +470,16 @@ const ShipperMarketplace: React.FC = () => {
                   </div>
                   
                   <div className="flex space-x-2">
-                    <button className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    <button 
+                      onClick={() => handleStartChat(carrier)}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
                       <MessageSquare className="h-4 w-4 mr-1" />
-                      Contact
+                      Chat
                     </button>
                     
                     <button 
-                      onClick={() => handleRequestQuote(carrier.id)}
+                      onClick={() => handleRequestQuote(carrier)}
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                     >
                       <Euro className="h-4 w-4 mr-1" />
@@ -473,6 +492,24 @@ const ShipperMarketplace: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Modals */}
+      {selectedCarrier && (
+        <>
+          <QuoteRequestModal
+            isOpen={showQuoteModal}
+            onClose={() => setShowQuoteModal(false)}
+            carrier={selectedCarrier}
+            onSubmit={handleQuoteSubmit}
+          />
+          
+          <ChatModal
+            isOpen={showChatModal}
+            onClose={() => setShowChatModal(false)}
+            carrier={selectedCarrier}
+          />
+        </>
+      )}
     </div>
   );
 };

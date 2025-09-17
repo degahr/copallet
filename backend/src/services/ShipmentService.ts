@@ -9,7 +9,13 @@ import {
   getBidsByCarrier,
   updateBid,
   Shipment,
-  Bid
+  Bid,
+  ShipmentTemplate,
+  createShipmentTemplate,
+  updateShipmentTemplate,
+  deleteShipmentTemplate,
+  getShipmentTemplate,
+  getTemplatesByShipper
 } from '../db/memory';
 import { CreateShipmentRequest, CreateBidRequest, ShipmentStatus } from '../types';
 
@@ -134,5 +140,50 @@ export class ShipmentService {
 
   static async declineBid(bidId: string): Promise<Bid | null> {
     return updateBid(bidId, { status: 'declined' }) || null;
+  }
+
+  // Template methods
+  static async getTemplates(shipperId: string): Promise<ShipmentTemplate[]> {
+    return getTemplatesByShipper(shipperId);
+  }
+
+  static async createTemplate(data: any, shipperId: string): Promise<ShipmentTemplate> {
+    return createShipmentTemplate({
+      ...data,
+      shipperId,
+    });
+  }
+
+  static async updateTemplate(templateId: string, data: any): Promise<ShipmentTemplate | null> {
+    return updateShipmentTemplate(templateId, data) || null;
+  }
+
+  static async deleteTemplate(templateId: string): Promise<boolean> {
+    return deleteShipmentTemplate(templateId);
+  }
+
+  static async getTemplate(templateId: string): Promise<ShipmentTemplate | null> {
+    return getShipmentTemplate(templateId) || null;
+  }
+
+  static async createShipmentFromTemplate(templateId: string, additionalData: any, shipperId: string): Promise<Shipment> {
+    const template = getShipmentTemplate(templateId);
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
+    if (template.shipperId !== shipperId) {
+      throw new Error('Access denied');
+    }
+
+    // Create shipment from template with additional data
+    const shipmentData = {
+      ...template,
+      ...additionalData,
+      shipperId,
+      status: 'draft' as ShipmentStatus,
+    };
+
+    return createShipment(shipmentData);
   }
 }

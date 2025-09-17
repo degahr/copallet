@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useShipment } from '../../contexts/ShipmentContext';
 import { Shipment, TrackingPoint } from '../../types';
+import { apiService } from '../../services/api';
 import { 
   MapPin, 
   Clock, 
@@ -11,49 +11,87 @@ import {
   AlertCircle,
   Navigation,
   Phone,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
 
 const Tracking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { shipments, trackingPoints, addTrackingPoint } = useShipment();
+  const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [trackingPoints, setTrackingPoints] = useState<TrackingPoint[]>([]);
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [eta, setEta] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const shipment = shipments.find(s => s.id === id);
-  const shipmentTrackingPoints = trackingPoints.filter(point => point.shipmentId === id);
+  // Fetch shipment and tracking data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch shipment details
+        const shipmentResponse = await apiService.getShipment(id);
+        setShipment(shipmentResponse.shipment);
+        
+        // Fetch tracking points
+        const trackingResponse = await apiService.getTrackingPoints(id);
+        setTrackingPoints(trackingResponse.trackingPoints || []);
+        
+      } catch (err) {
+        console.error('Error fetching tracking data:', err);
+        setError('Failed to load tracking data');
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    fetchData();
+  }, [id]);
+
+  // Real-time tracking simulation
   useEffect(() => {
     if (isTracking && shipment) {
-      // Simulate GPS tracking
-      const interval = setInterval(() => {
-        // Mock location updates
-        const mockLocation = {
-          lat: 52.3676 + (Math.random() - 0.5) * 0.01,
-          lng: 4.9041 + (Math.random() - 0.5) * 0.01
-        };
-        
-        setCurrentLocation(mockLocation);
-        
-        // Add tracking point
-        addTrackingPoint({
-          shipmentId: shipment.id,
-          lat: mockLocation.lat,
-          lng: mockLocation.lng,
-          timestamp: new Date(),
-          accuracy: 5
-        });
+      // Simulate GPS tracking with real API calls
+      const interval = setInterval(async () => {
+        try {
+          // Mock location updates (in real app, this would be actual GPS)
+          const mockLocation = {
+            lat: 52.3676 + (Math.random() - 0.5) * 0.01,
+            lng: 4.9041 + (Math.random() - 0.5) * 0.01
+          };
+          
+          setCurrentLocation(mockLocation);
+          
+          // Add tracking point via API
+          await apiService.addTrackingPoint(shipment.id, {
+            latitude: mockLocation.lat,
+            longitude: mockLocation.lng,
+            accuracy: 5,
+            speed: Math.random() * 80 + 20, // Random speed between 20-100 km/h
+            heading: Math.random() * 360 // Random heading
+          });
 
-        // Calculate ETA (mock)
-        const remainingDistance = Math.max(0, 150 - shipmentTrackingPoints.length * 10);
-        const etaMinutes = Math.floor(remainingDistance / 60 * 60); // Assuming 60 km/h
-        setEta(`${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}m`);
+          // Refresh tracking points
+          const trackingResponse = await apiService.getTrackingPoints(shipment.id);
+          setTrackingPoints(trackingResponse.trackingPoints || []);
+
+          // Calculate ETA (mock)
+          const remainingDistance = Math.max(0, 150 - trackingPoints.length * 10);
+          const etaMinutes = Math.floor(remainingDistance / 60 * 60); // Assuming 60 km/h
+          setEta(`${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}m`);
+        } catch (err) {
+          console.error('Error adding tracking point:', err);
+        }
       }, 10000); // Update every 10 seconds
 
       return () => clearInterval(interval);
     }
-  }, [isTracking, shipment, shipmentTrackingPoints.length, addTrackingPoint]);
+  }, [isTracking, shipment, trackingPoints.length]);
 
   const startTracking = () => {
     setIsTracking(true);
@@ -114,6 +152,32 @@ const Tracking: React.FC = () => {
       minute: '2-digit'
     });
   };
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-600 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Loading Tracking Data</h1>
+        <p className="text-gray-600">Please wait while we fetch the latest tracking information...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Tracking</h1>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (!shipment) {
     return (
@@ -196,7 +260,7 @@ const Tracking: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Tracking History</h2>
             
-            {shipmentTrackingPoints.length === 0 ? (
+            {trackingPoints.length === 0 ? (
               <div className="text-center py-8">
                 <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600">No tracking data yet</p>
@@ -204,7 +268,7 @@ const Tracking: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {shipmentTrackingPoints.slice(-10).reverse().map((point) => (
+                {trackingPoints.slice(-10).reverse().map((point) => (
                   <div key={point.id} className="flex items-center p-3 bg-gray-50 rounded-lg">
                     <div className="flex-shrink-0">
                       <div className="h-3 w-3 bg-primary-600 rounded-full"></div>
@@ -219,8 +283,9 @@ const Tracking: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-xs text-gray-600">
-                        {point.lat.toFixed(4)}, {point.lng.toFixed(4)}
+                        {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}
                         {point.accuracy && ` (±${point.accuracy}m)`}
+                        {point.speed && ` • ${point.speed.toFixed(1)} km/h`}
                       </div>
                     </div>
                   </div>
@@ -253,14 +318,14 @@ const Tracking: React.FC = () => {
               
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Tracking Points</span>
-                <span className="text-sm font-medium text-gray-900">{shipmentTrackingPoints.length}</span>
+                <span className="text-sm font-medium text-gray-900">{trackingPoints.length}</span>
               </div>
               
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Last Update</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {shipmentTrackingPoints.length > 0 
-                    ? formatTime(shipmentTrackingPoints[shipmentTrackingPoints.length - 1].timestamp)
+                  {trackingPoints.length > 0 
+                    ? formatTime(trackingPoints[trackingPoints.length - 1].timestamp)
                     : 'Never'
                   }
                 </span>

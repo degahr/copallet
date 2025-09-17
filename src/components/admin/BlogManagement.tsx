@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Plus, 
@@ -13,29 +13,62 @@ import {
   MoreVertical,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
+import { apiService } from '../../services/api';
 
 interface BlogPost {
-  id: number;
+  id: string;
   title: string;
-  excerpt: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
   author: string;
+  authorBio?: string;
+  authorImage?: string;
   date: string;
   category: string;
-  readTime: string;
-  status: 'published' | 'draft' | 'scheduled';
+  readTime?: string;
+  image?: string;
   featured: boolean;
   tags: string[];
+  status: 'published' | 'draft' | 'scheduled';
+  scheduledAt?: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const BlogManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft' | 'scheduled'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock blog posts data
-  const [blogPosts] = useState<BlogPost[]>([
+  // Fetch blog posts from API
+  useEffect(() => {
+    const fetchBlogPosts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const posts = await apiService.getAllBlogPosts();
+        setBlogPosts(posts);
+      } catch (err) {
+        console.error('Error fetching blog posts:', err);
+        setError('Failed to load blog posts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBlogPosts();
+  }, []);
+
+  // Mock blog posts data (fallback)
+  const mockBlogPosts: BlogPost[] = [
     {
       id: 1,
       title: "The Future of Pallet Freight: Digital Transformation in Logistics",
@@ -96,13 +129,26 @@ const BlogManagement: React.FC = () => {
       featured: false,
       tags: ["Sustainability", "Green Logistics", "Environment"]
     }
-  ]);
+  ];
 
   const categories = ["Industry Insights", "Shipping Tips", "Cost Management", "Compliance", "Sustainability", "Technology"];
 
+  // Handle delete blog post
+  const handleDeletePost = async (postId: string) => {
+    if (window.confirm('Are you sure you want to delete this blog post?')) {
+      try {
+        await apiService.deleteBlogPost(postId);
+        setBlogPosts(prev => prev.filter(post => post.id !== postId));
+      } catch (err) {
+        console.error('Error deleting blog post:', err);
+        alert('Failed to delete blog post');
+      }
+    }
+  };
+
   const filteredPosts = blogPosts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (post.excerpt && post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          post.author.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = filterStatus === 'all' || post.status === filterStatus;
@@ -136,6 +182,31 @@ const BlogManagement: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600 mr-3" />
+        <span className="text-lg text-gray-600">Loading blog posts...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Blog Posts</h3>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -302,6 +373,7 @@ const BlogManagement: React.FC = () => {
                       <button
                         className="text-red-600 hover:text-red-900"
                         title="Delete Post"
+                        onClick={() => handleDeletePost(post.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

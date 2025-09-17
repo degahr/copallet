@@ -84,6 +84,9 @@ interface TrackingPoint {
   timestamp: Date;
   status: string;
   notes?: string;
+  accuracy?: number;
+  speed?: number;
+  heading?: number;
 }
 
 interface POD {
@@ -148,6 +151,28 @@ interface CarrierCostModel {
   createdAt: Date;
 }
 
+interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  author: string;
+  authorBio?: string;
+  authorImage?: string;
+  date: Date;
+  category: string;
+  readTime?: string;
+  image?: string;
+  featured: boolean;
+  tags: string[];
+  status: 'draft' | 'published' | 'scheduled';
+  scheduledAt?: Date;
+  publishedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // In-memory storage
 const users: Map<string, User> = new Map();
 const userProfiles: Map<string, UserProfile> = new Map();
@@ -161,6 +186,7 @@ const ratings: Map<string, Rating> = new Map();
 const shipmentTemplates: Map<string, ShipmentTemplate> = new Map();
 const autoBidRules: Map<string, AutoBidRule> = new Map();
 const carrierCostModels: Map<string, CarrierCostModel> = new Map();
+const blogPosts: Map<string, BlogPost> = new Map();
 
 // Helper functions
 export const generateId = (): string => {
@@ -394,6 +420,28 @@ export const createShipmentTemplate = (data: Omit<ShipmentTemplate, 'id' | 'crea
   return template;
 };
 
+export const updateShipmentTemplate = (id: string, updates: Partial<Omit<ShipmentTemplate, 'id' | 'createdAt'>>): ShipmentTemplate | undefined => {
+  const template = shipmentTemplates.get(id);
+  if (!template) return undefined;
+  
+  const updatedTemplate = {
+    ...template,
+    ...updates,
+    updatedAt: new Date()
+  };
+  
+  shipmentTemplates.set(id, updatedTemplate);
+  return updatedTemplate;
+};
+
+export const deleteShipmentTemplate = (id: string): boolean => {
+  return shipmentTemplates.delete(id);
+};
+
+export const getShipmentTemplate = (id: string): ShipmentTemplate | undefined => {
+  return shipmentTemplates.get(id);
+};
+
 export const getTemplatesByShipper = (shipperId: string): ShipmentTemplate[] => {
   return Array.from(shipmentTemplates.values()).filter(template => template.shipperId === shipperId);
 };
@@ -428,6 +476,78 @@ export const createCarrierCostModel = (data: Omit<CarrierCostModel, 'id' | 'crea
 
 export const getCostModelsByCarrier = (carrierId: string): CarrierCostModel[] => {
   return Array.from(carrierCostModels.values()).filter(model => model.carrierId === carrierId);
+};
+
+// Blog post functions
+export const createBlogPost = (data: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>): BlogPost => {
+  const id = generateId();
+  const now = new Date();
+  const slug = data.title.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+  
+  const post: BlogPost = {
+    id,
+    ...data,
+    slug,
+    createdAt: now,
+    updatedAt: now,
+  };
+  blogPosts.set(id, post);
+  return post;
+};
+
+export const updateBlogPost = (id: string, updates: Partial<Omit<BlogPost, 'id' | 'createdAt'>>): BlogPost | undefined => {
+  const post = blogPosts.get(id);
+  if (!post) return undefined;
+  
+  const updatedPost = {
+    ...post,
+    ...updates,
+    updatedAt: new Date(),
+  };
+  
+  // Update slug if title changed
+  if (updates.title) {
+    updatedPost.slug = updates.title.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+  
+  blogPosts.set(id, updatedPost);
+  return updatedPost;
+};
+
+export const getBlogPost = (id: string): BlogPost | undefined => {
+  return blogPosts.get(id);
+};
+
+export const getBlogPostBySlug = (slug: string): BlogPost | undefined => {
+  return Array.from(blogPosts.values()).find(post => post.slug === slug);
+};
+
+export const getAllBlogPosts = (): BlogPost[] => {
+  return Array.from(blogPosts.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+};
+
+export const getPublishedBlogPosts = (): BlogPost[] => {
+  return Array.from(blogPosts.values())
+    .filter(post => post.status === 'published')
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+};
+
+export const getBlogPostsByCategory = (category: string): BlogPost[] => {
+  return Array.from(blogPosts.values())
+    .filter(post => post.category === category && post.status === 'published')
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+};
+
+export const deleteBlogPost = (id: string): boolean => {
+  return blogPosts.delete(id);
 };
 
 import bcrypt from 'bcryptjs';
@@ -1263,6 +1383,270 @@ export const seedDatabase = async () => {
   console.log(`Total templates created: ${shipmentTemplates.size}`);
   console.log(`Total auto-bid rules created: ${autoBidRules.size}`);
   console.log(`Total cost models created: ${carrierCostModels.size}`);
+
+  // Sample blog posts
+  createBlogPost({
+    title: "The Future of Pallet Freight: Digital Transformation in Logistics",
+    slug: "future-pallet-freight-digital-transformation",
+    date: new Date('2024-01-15'),
+    content: `
+      <p>The logistics industry is undergoing a massive digital transformation, and pallet freight is at the forefront of this revolution. Traditional freight forwarding methods are being replaced by intelligent platforms that connect shippers with carriers in real-time.</p>
+      
+      <h2>The Current State of Pallet Freight</h2>
+      <p>Pallet freight represents one of the most efficient ways to transport goods across Europe. With standardized pallet sizes and established networks, it offers reliability and cost-effectiveness that other transport methods struggle to match.</p>
+      
+      <p>However, the industry has faced several challenges:</p>
+      <ul>
+        <li>Fragmented carrier networks</li>
+        <li>Manual booking processes</li>
+        <li>Limited visibility into shipment status</li>
+        <li>Inefficient route planning</li>
+      </ul>
+      
+      <h2>Digital Platforms: The Game Changer</h2>
+      <p>Digital freight platforms like CoPallet are revolutionizing the industry by:</p>
+      
+      <h3>1. Intelligent Matching</h3>
+      <p>Advanced algorithms analyze shipment requirements and carrier capabilities to find the perfect match. This reduces empty miles and improves efficiency.</p>
+      
+      <h3>2. Real-Time Tracking</h3>
+      <p>GPS tracking and automated updates provide complete visibility from pickup to delivery. Shippers can track their goods in real-time, reducing anxiety and improving customer service.</p>
+      
+      <h3>3. Automated Processes</h3>
+      <p>From booking to invoicing, digital platforms automate routine tasks, reducing errors and administrative overhead.</p>
+      
+      <h2>The Benefits for Shippers</h2>
+      <p>Shippers are seeing significant benefits from digital freight platforms:</p>
+      
+      <ul>
+        <li><strong>Cost Reduction:</strong> Up to 30% savings through better carrier matching and reduced empty miles</li>
+        <li><strong>Improved Reliability:</strong> Verified carriers and performance tracking ensure consistent service</li>
+        <li><strong>Better Visibility:</strong> Real-time tracking and automated notifications</li>
+        <li><strong>Simplified Management:</strong> One platform for all freight needs</li>
+      </ul>
+      
+      <h2>The Benefits for Carriers</h2>
+      <p>Carriers also benefit significantly:</p>
+      
+      <ul>
+        <li><strong>Increased Load Utilization:</strong> Better matching reduces empty return journeys</li>
+        <li><strong>Streamlined Operations:</strong> Automated booking and documentation</li>
+        <li><strong>Performance Insights:</strong> Analytics help optimize routes and pricing</li>
+        <li><strong>Direct Access:</strong> Connect directly with shippers without intermediaries</li>
+      </ul>
+      
+      <h2>Looking Ahead: The Future of Digital Freight</h2>
+      <p>The future of pallet freight is undoubtedly digital. We're seeing several trends emerging:</p>
+      
+      <h3>Artificial Intelligence</h3>
+      <p>AI is being used for predictive analytics, demand forecasting, and dynamic pricing. This helps optimize the entire supply chain.</p>
+      
+      <h3>Blockchain Integration</h3>
+      <p>Blockchain technology is being explored for secure, transparent documentation and smart contracts.</p>
+      
+      <h3>Sustainability Focus</h3>
+      <p>Digital platforms are helping reduce carbon emissions through better route optimization and load consolidation.</p>
+      
+      <h2>Conclusion</h2>
+      <p>The digital transformation of pallet freight is not just a trend—it's a necessity. Companies that embrace these technologies will be better positioned to compete in an increasingly complex logistics landscape.</p>
+      
+      <p>At CoPallet, we're proud to be part of this transformation, helping shippers and carriers alike benefit from the power of digital logistics.</p>
+    `,
+    excerpt: "Discover how digital platforms are revolutionizing the pallet freight industry, making shipping more efficient and cost-effective for businesses of all sizes.",
+    author: "Sarah Johnson",
+    authorBio: "Sarah is a logistics technology expert with over 10 years of experience in freight management and digital transformation.",
+    authorImage: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face",
+    category: "Industry Insights",
+    readTime: "5 min read",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=400&fit=crop",
+    featured: true,
+    tags: ["Digital Transformation", "Logistics", "Freight", "Technology"],
+    status: "published",
+    publishedAt: new Date('2024-01-15'),
+  });
+
+  createBlogPost({
+    title: "How to Choose the Right Carrier for Your Shipments",
+    slug: "how-to-choose-right-carrier-shipments",
+    date: new Date('2024-01-10'),
+    content: `
+      <p>Selecting the right carrier is crucial for successful freight management. With so many options available, it can be challenging to make the best choice. Here's a comprehensive guide to help you choose the perfect carrier for your shipments.</p>
+      
+      <h2>1. Assess Your Requirements</h2>
+      <p>Before selecting a carrier, clearly define your shipping needs:</p>
+      
+      <ul>
+        <li><strong>Shipment Volume:</strong> How many pallets do you ship regularly?</li>
+        <li><strong>Geographic Coverage:</strong> What regions do you need coverage for?</li>
+        <li><strong>Service Level:</strong> Do you need standard or express delivery?</li>
+        <li><strong>Special Requirements:</strong> ADR, temperature control, tail lift, etc.</li>
+        <li><strong>Budget Constraints:</strong> What's your target cost per shipment?</li>
+      </ul>
+      
+      <h2>2. Evaluate Carrier Capabilities</h2>
+      <p>Look for carriers that match your specific requirements:</p>
+      
+      <h3>Fleet Size and Capacity</h3>
+      <p>Ensure the carrier has sufficient capacity to handle your volume consistently. A carrier with a small fleet might struggle during peak periods.</p>
+      
+      <h3>Service Areas</h3>
+      <p>Verify that the carrier operates in all the regions you need. Some carriers specialize in specific routes or regions.</p>
+      
+      <h3>Equipment and Capabilities</h3>
+      <p>Check if they have the right equipment for your needs:</p>
+      <ul>
+        <li>Tail lift trucks for ground-level delivery</li>
+        <li>Temperature-controlled vehicles for perishables</li>
+        <li>ADR-certified drivers for dangerous goods</li>
+        <li>Forklift access for loading/unloading</li>
+      </ul>
+      
+      <h2>3. Check Performance Metrics</h2>
+      <p>Look for carriers with strong performance records:</p>
+      
+      <ul>
+        <li><strong>On-Time Delivery:</strong> What percentage of deliveries are on time?</li>
+        <li><strong>Damage Rate:</strong> How often do shipments arrive damaged?</li>
+        <li><strong>Customer Satisfaction:</strong> What do other shippers say about them?</li>
+        <li><strong>Response Time:</strong> How quickly do they respond to inquiries?</li>
+      </ul>
+      
+      <h2>4. Consider Pricing Structure</h2>
+      <p>Understand how carriers price their services:</p>
+      
+      <ul>
+        <li><strong>Base Rate:</strong> Minimum charge per shipment</li>
+        <li><strong>Per Kilometer:</strong> Distance-based pricing</li>
+        <li><strong>Per Pallet:</strong> Volume-based pricing</li>
+        <li><strong>Surcharges:</strong> Additional fees for special services</li>
+      </ul>
+      
+      <h2>5. Verify Insurance and Compliance</h2>
+      <p>Ensure the carrier meets all legal and insurance requirements:</p>
+      
+      <ul>
+        <li>Proper insurance coverage for your goods</li>
+        <li>Valid operating licenses</li>
+        <li>ADR certification for dangerous goods</li>
+        <li>Compliance with local regulations</li>
+      </ul>
+      
+      <h2>6. Test with Small Shipments</h2>
+      <p>Before committing to a large contract, test the carrier with smaller shipments:</p>
+      
+      <ul>
+        <li>Evaluate their communication and updates</li>
+        <li>Check delivery times and condition of goods</li>
+        <li>Assess their problem-solving capabilities</li>
+        <li>Review their invoicing and documentation</li>
+      </ul>
+      
+      <h2>7. Build Long-Term Relationships</h2>
+      <p>Once you find reliable carriers, invest in building relationships:</p>
+      
+      <ul>
+        <li>Provide consistent volume for better rates</li>
+        <li>Give advance notice of shipments when possible</li>
+        <li>Pay invoices promptly</li>
+        <li>Provide feedback to help them improve</li>
+      </ul>
+      
+      <h2>Conclusion</h2>
+      <p>Choosing the right carrier is an investment in your supply chain success. Take the time to evaluate options thoroughly, test relationships, and build partnerships that will serve your business for years to come.</p>
+      
+      <p>Remember, the cheapest option isn't always the best. Focus on finding carriers that offer the right combination of reliability, service, and value for your specific needs.</p>
+    `,
+    excerpt: "Learn the key factors to consider when selecting a carrier, from pricing and reliability to specialized services and coverage areas.",
+    author: "Mike Chen",
+    authorBio: "Mike is a supply chain consultant specializing in carrier selection and freight optimization strategies.",
+    authorImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    category: "Shipping Tips",
+    readTime: "4 min read",
+    image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=800&h=400&fit=crop",
+    featured: false,
+    tags: ["Carrier Selection", "Logistics", "Best Practices"],
+    status: "published",
+    publishedAt: new Date('2024-01-10'),
+  });
+
+  createBlogPost({
+    title: "Cost Optimization Strategies for Pallet Shipping",
+    slug: "cost-optimization-strategies-pallet-shipping",
+    date: new Date('2024-01-05'),
+    content: `
+      <p>Reducing shipping costs while maintaining service quality is a constant challenge for businesses. Here are proven strategies to optimize your pallet shipping costs without compromising on delivery performance.</p>
+      
+      <h2>1. Consolidate Shipments</h2>
+      <p>One of the most effective ways to reduce costs is through shipment consolidation:</p>
+      
+      <ul>
+        <li><strong>Batch Orders:</strong> Group multiple orders going to the same region</li>
+        <li><strong>Schedule Optimization:</strong> Plan shipments for optimal carrier utilization</li>
+        <li><strong>Route Planning:</strong> Combine shipments on efficient routes</li>
+      </ul>
+      
+      <h2>2. Optimize Pallet Utilization</h2>
+      <p>Maximize the use of each pallet space:</p>
+      
+      <ul>
+        <li><strong>Efficient Packing:</strong> Use proper palletization techniques</li>
+        <li><strong>Mixed Loads:</strong> Combine compatible products on single pallets</li>
+        <li><strong>Standard Sizes:</strong> Use standard pallet sizes for better carrier compatibility</li>
+      </ul>
+      
+      <h2>3. Leverage Technology</h2>
+      <p>Digital platforms can significantly reduce costs:</p>
+      
+      <ul>
+        <li><strong>Real-Time Pricing:</strong> Compare rates across multiple carriers instantly</li>
+        <li><strong>Route Optimization:</strong> AI-powered route planning reduces fuel costs</li>
+        <li><strong>Load Matching:</strong> Better matching reduces empty miles</li>
+      </ul>
+      
+      <h2>4. Build Carrier Relationships</h2>
+      <p>Long-term relationships often lead to better rates:</p>
+      
+      <ul>
+        <li><strong>Volume Commitments:</strong> Guarantee minimum volumes for better rates</li>
+        <li><strong>Regular Routes:</strong> Establish consistent routes for preferred pricing</li>
+        <li><strong>Performance Incentives:</strong> Reward carriers for excellent service</li>
+      </ul>
+      
+      <h2>5. Flexible Scheduling</h2>
+      <p>Flexibility can lead to significant savings:</p>
+      
+      <ul>
+        <li><strong>Off-Peak Shipping:</strong> Ship during less busy periods for better rates</li>
+        <li><strong>Lead Time Optimization:</strong> Give carriers more time for better pricing</li>
+        <li><strong>Alternative Routes:</strong> Consider slightly longer routes for better rates</li>
+      </ul>
+      
+      <h2>6. Monitor and Analyze</h2>
+      <p>Regular analysis helps identify cost-saving opportunities:</p>
+      
+      <ul>
+        <li><strong>Cost Tracking:</strong> Monitor shipping costs by route, carrier, and time</li>
+        <li><strong>Performance Metrics:</strong> Track delivery times and service quality</li>
+        <li><strong>Trend Analysis:</strong> Identify patterns and optimization opportunities</li>
+      </ul>
+      
+      <h2>Conclusion</h2>
+      <p>Cost optimization is an ongoing process that requires continuous monitoring and adjustment. By implementing these strategies, you can significantly reduce your pallet shipping costs while maintaining or improving service quality.</p>
+    `,
+    excerpt: "Explore proven strategies to reduce your pallet shipping costs while maintaining service quality and delivery reliability.",
+    author: "Emma Davis",
+    authorBio: "Emma is a logistics cost optimization specialist with expertise in freight management and supply chain efficiency.",
+    authorImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
+    category: "Cost Management",
+    readTime: "6 min read",
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=400&fit=crop",
+    featured: false,
+    tags: ["Cost Optimization", "Shipping", "Efficiency"],
+    status: "published",
+    publishedAt: new Date('2024-01-05'),
+  });
+
+  console.log(`Total blog posts created: ${blogPosts.size}`);
 };
 
 export { 
@@ -1277,5 +1661,6 @@ export {
   Rating, 
   ShipmentTemplate, 
   AutoBidRule, 
-  CarrierCostModel 
+  CarrierCostModel,
+  BlogPost
 };

@@ -13,6 +13,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import shipmentRoutes from './routes/shipments';
 import adminRoutes from './routes/admin';
+import blogRoutes from './routes/blog';
 
 import { seedDatabase } from './db/memory';
 
@@ -124,6 +125,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/blog', blogRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -134,7 +136,9 @@ app.use('*', (req, res) => {
       'GET /health',
       'GET /api/test',
       'POST /api/auth/signup',
-      'POST /api/auth/login'
+      'POST /api/auth/login',
+      'GET /api/blog',
+      'GET /api/blog/:id'
     ]
   });
 });

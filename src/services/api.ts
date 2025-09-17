@@ -1,10 +1,29 @@
 // API configuration
 const getApiBaseUrl = () => {
+  // Check for environment variable first
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) {
+    console.log('Using VITE_API_URL:', envUrl);
     // Ensure the URL ends with /api
     return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
   }
+  
+  // Fallback: detect environment based on hostname
+  const hostname = window.location.hostname;
+  console.log('No VITE_API_URL found, detecting environment from hostname:', hostname);
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('Detected local development environment');
+    return 'http://localhost:3001/api';
+  }
+  
+  if (hostname.includes('render.com')) {
+    console.log('Detected Render production environment');
+    return 'https://copallet-w9do.onrender.com/api';
+  }
+  
+  // Default fallback
+  console.log('Using default localhost fallback');
   return 'http://localhost:3001/api';
 };
 
@@ -188,6 +207,123 @@ class ApiService {
   async getBids(): Promise<any[]> {
     const response = await this.request<{ bids: any[] }>('/shipments/bids');
     return response.bids || [];
+  }
+
+  // Blog posts
+  async getBlogPosts(category?: string, featured?: boolean): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (featured) params.append('featured', 'true');
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/blog?${queryString}` : '/blog';
+    const response = await this.request<{ posts: any[] }>(endpoint);
+    return response.posts || [];
+  }
+
+  async getBlogPost(id: string): Promise<any> {
+    return this.request<{ post: any }>(`/blog/${id}`);
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<any> {
+    return this.request<{ post: any }>(`/blog/slug/${slug}`);
+  }
+
+  async createBlogPost(postData: any): Promise<any> {
+    return this.request<{ post: any }>('/blog', {
+      method: 'POST',
+      body: JSON.stringify(postData),
+    });
+  }
+
+  async updateBlogPost(id: string, postData: any): Promise<any> {
+    return this.request<{ post: any }>(`/blog/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(postData),
+    });
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await this.request(`/blog/${id}`, { method: 'DELETE' });
+  }
+
+  async getAllBlogPosts(): Promise<any[]> {
+    const response = await this.request<{ posts: any[] }>('/blog/admin');
+    return response.posts || [];
+  }
+
+  // Shipment Templates
+  async getShipmentTemplates(): Promise<any[]> {
+    const response = await this.request<{ templates: any[] }>('/shipments/templates');
+    return response.templates || [];
+  }
+
+  async createShipmentTemplate(templateData: any): Promise<any> {
+    return this.request<{ template: any }>('/shipments/templates', {
+      method: 'POST',
+      body: JSON.stringify(templateData),
+    });
+  }
+
+  async updateShipmentTemplate(id: string, templateData: any): Promise<any> {
+    return this.request<{ template: any }>(`/shipments/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData),
+    });
+  }
+
+  async deleteShipmentTemplate(id: string): Promise<void> {
+    await this.request(`/shipments/templates/${id}`, { method: 'DELETE' });
+  }
+
+  async createShipmentFromTemplate(templateId: string, shipmentData: any): Promise<any> {
+    return this.request<{ shipment: any }>(`/shipments/templates/${templateId}/create-shipment`, {
+      method: 'POST',
+      body: JSON.stringify(shipmentData),
+    });
+  }
+
+  // Company Profile
+  async getCompanyProfile(): Promise<any> {
+    return this.request<{ profile: any }>('/users/company-profile');
+  }
+
+  async updateCompanyProfile(profileData: any): Promise<any> {
+    return this.request<{ profile: any }>('/users/company-profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+  }
+
+  async uploadCompanyLogo(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('logo', file);
+    
+    return this.request<{ logoUrl: string }>('/users/company-logo', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Don't set Content-Type, let browser set it with boundary
+      },
+    });
+  }
+
+  // Tracking methods
+  async getTrackingPoints(shipmentId: string): Promise<any> {
+    return this.request<{ shipmentId: string; trackingPoints: any[] }>(`/shipments/${shipmentId}/tracking`);
+  }
+
+  async addTrackingPoint(shipmentId: string, trackingData: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    speed?: number;
+    heading?: number;
+  }): Promise<any> {
+    return this.request<{ trackingPoint: any }>(`/shipments/${shipmentId}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(trackingData),
+    });
   }
 }
 

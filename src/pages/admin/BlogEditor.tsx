@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Save, 
@@ -11,24 +11,31 @@ import {
   Tag,
   Clock,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
+import { apiService } from '../../services/api';
 
 interface BlogPost {
-  id: number;
+  id: string;
   title: string;
+  slug: string;
   content: string;
-  excerpt: string;
+  excerpt?: string;
   author: string;
-  authorBio: string;
-  authorImage: string;
+  authorBio?: string;
+  authorImage?: string;
   date: string;
   category: string;
-  readTime: string;
-  image: string;
+  readTime?: string;
+  image?: string;
   featured: boolean;
   tags: string[];
   status: 'published' | 'draft' | 'scheduled';
+  scheduledAt?: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const BlogEditor: React.FC = () => {
@@ -37,8 +44,9 @@ const BlogEditor: React.FC = () => {
   const isEditing = id && id !== 'create';
 
   const [formData, setFormData] = useState<BlogPost>({
-    id: isEditing ? parseInt(id) : Date.now(),
+    id: '',
     title: '',
+    slug: '',
     content: '',
     excerpt: '',
     author: 'Admin User',
@@ -50,13 +58,49 @@ const BlogEditor: React.FC = () => {
     image: '',
     featured: false,
     tags: [],
-    status: 'draft'
+    status: 'draft',
+    scheduledAt: '',
+    publishedAt: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   });
 
   const [newTag, setNewTag] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch blog post data if editing
+  useEffect(() => {
+    if (isEditing && id) {
+      const fetchBlogPost = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const response = await apiService.getBlogPost(id);
+          const post = response.post;
+          setFormData({
+            ...post,
+            date: new Date(post.date).toISOString().split('T')[0],
+            scheduledAt: post.scheduledAt ? new Date(post.scheduledAt).toISOString().split('T')[0] : '',
+            publishedAt: post.publishedAt ? new Date(post.publishedAt).toISOString().split('T')[0] : '',
+            createdAt: new Date(post.createdAt).toISOString(),
+            updatedAt: new Date(post.updatedAt).toISOString()
+          });
+        } catch (err) {
+          console.error('Error fetching blog post:', err);
+          setError('Failed to load blog post');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchBlogPost();
+    }
+  }, [isEditing, id]);
 
   const categories = [
     'Industry Insights',
@@ -91,19 +135,40 @@ const BlogEditor: React.FC = () => {
     }));
   };
 
-  const handleSave = (status: 'published' | 'draft' | 'scheduled') => {
-    const postData = {
-      ...formData,
-      status,
-      date: status === 'scheduled' ? scheduledDate : formData.date
-    };
-    
-    console.log('Saving blog post:', postData);
-    
-    // In a real app, this would save to the backend
-    alert(`Blog post ${status === 'published' ? 'published' : status === 'scheduled' ? 'scheduled' : 'saved as draft'} successfully!`);
-    
-    navigate('/app/admin/blog');
+  const handleSave = async (status: 'published' | 'draft' | 'scheduled') => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      const postData = {
+        title: formData.title,
+        content: formData.content,
+        excerpt: formData.excerpt,
+        author: formData.author,
+        authorBio: formData.authorBio,
+        authorImage: formData.authorImage,
+        category: formData.category,
+        readTime: formData.readTime,
+        image: formData.image,
+        featured: formData.featured,
+        tags: formData.tags,
+        status,
+        scheduledAt: status === 'scheduled' ? scheduledDate ? new Date(scheduledDate).toISOString() : undefined : undefined
+      };
+
+      if (isEditing) {
+        await apiService.updateBlogPost(formData.id, postData);
+      } else {
+        await apiService.createBlogPost(postData);
+      }
+      
+      navigate('/app/admin/blog');
+    } catch (err) {
+      console.error('Error saving blog post:', err);
+      setError('Failed to save blog post');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const calculateReadTime = (content: string) => {
@@ -120,6 +185,31 @@ const BlogEditor: React.FC = () => {
       readTime: calculateReadTime(content)
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600 mr-3" />
+        <span className="text-lg text-gray-600">Loading blog post...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Blog Post</h3>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button 
+          onClick={() => navigate('/app/admin/blog')} 
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+        >
+          Back to Blog Management
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -154,18 +244,38 @@ const BlogEditor: React.FC = () => {
           
           <button
             onClick={() => handleSave('draft')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="h-4 w-4 mr-2" />
-            Save Draft
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft
+              </>
+            )}
           </button>
           
           <button
             onClick={() => handleSave('published')}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Publish
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Publishing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Publish
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { authenticateToken, requireVerified, requireShipper, requireCarrier } from '../middleware/auth/authMiddleware';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, CustomError } from '../middleware/errorHandler';
 import { ShipmentService } from '../services/ShipmentService';
 import { CreateShipmentRequestSchema, CreateBidRequestSchema } from '../types';
+import { getShipment, createTrackingPoint, getTrackingPointsByShipment } from '../db/memory';
 
 const router = Router();
 
@@ -38,6 +39,68 @@ router.get('/bids', requireVerified, asyncHandler(async (req, res) => {
   }
   
   res.json({ bids });
+}));
+
+// Shipment Templates routes
+// GET /api/shipments/templates - Get user's templates
+router.get('/templates', authenticateToken, asyncHandler(async (req, res) => {
+  const templates = await ShipmentService.getTemplates(req.user!.userId);
+  res.json({ templates });
+}));
+
+// POST /api/shipments/templates - Create new template
+router.post('/templates', authenticateToken, asyncHandler(async (req, res) => {
+  if (req.user!.role !== 'shipper') {
+    throw new CustomError('Only shippers can create templates', 403);
+  }
+  
+  const template = await ShipmentService.createTemplate(req.body, req.user!.userId);
+  res.status(201).json({
+    message: 'Template created successfully',
+    template
+  });
+}));
+
+// PUT /api/shipments/templates/:id - Update template
+router.put('/templates/:id', authenticateToken, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const template = await ShipmentService.updateTemplate(id, req.body);
+  
+  if (!template) {
+    return res.status(404).json({ message: 'Template not found' });
+  }
+  
+  res.json({
+    message: 'Template updated successfully',
+    template
+  });
+}));
+
+// DELETE /api/shipments/templates/:id - Delete template
+router.delete('/templates/:id', authenticateToken, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const deleted = await ShipmentService.deleteTemplate(id);
+  
+  if (!deleted) {
+    return res.status(404).json({ message: 'Template not found' });
+  }
+  
+  res.json({ message: 'Template deleted successfully' });
+}));
+
+// POST /api/shipments/templates/:id/create-shipment - Create shipment from template
+router.post('/templates/:id/create-shipment', authenticateToken, asyncHandler(async (req, res) => {
+  if (req.user!.role !== 'shipper') {
+    throw new CustomError('Only shippers can create shipments', 403);
+  }
+  
+  const { id } = req.params;
+  const shipment = await ShipmentService.createShipmentFromTemplate(id, req.body, req.user!.userId);
+  
+  res.status(201).json({
+    message: 'Shipment created from template successfully',
+    shipment
+  });
 }));
 
 // POST /api/shipments
@@ -94,14 +157,55 @@ router.put('/:id/bids/:bidId/accept', requireVerified, requireShipper, asyncHand
 
 // GET /api/shipments/:id/tracking
 router.get('/:id/tracking', requireVerified, asyncHandler(async (req, res) => {
-  // TODO: Implement get tracking points
-  res.json({ message: 'Get tracking points - TODO' });
+  const { id } = req.params;
+  
+  // Verify shipment exists
+  const shipment = getShipment(id);
+  if (!shipment) {
+    return res.status(404).json({ message: 'Shipment not found' });
+  }
+  
+  // Get tracking points for this shipment
+  const trackingPoints = getTrackingPointsByShipment(id);
+  
+  res.json({ 
+    shipmentId: id,
+    trackingPoints: trackingPoints.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  });
 }));
 
 // POST /api/shipments/:id/tracking
 router.post('/:id/tracking', requireVerified, requireCarrier, asyncHandler(async (req, res) => {
-  // TODO: Implement add tracking point
-  res.json({ message: 'Add tracking point - TODO' });
+  const { id } = req.params;
+  const { latitude, longitude, accuracy, speed, heading } = req.body;
+  
+  // Verify shipment exists
+  const shipment = getShipment(id);
+  if (!shipment) {
+    return res.status(404).json({ message: 'Shipment not found' });
+  }
+  
+  // Validate required fields
+  if (!latitude || !longitude) {
+    return res.status(400).json({ message: 'Latitude and longitude are required' });
+  }
+  
+  // Create tracking point
+  const trackingPoint = createTrackingPoint({
+    shipmentId: id,
+    latitude: parseFloat(latitude),
+    longitude: parseFloat(longitude),
+    timestamp: new Date(),
+    status: 'in-transit',
+    accuracy: accuracy ? parseFloat(accuracy) : undefined,
+    speed: speed ? parseFloat(speed) : undefined,
+    heading: heading ? parseFloat(heading) : undefined,
+  });
+  
+  res.status(201).json({ 
+    message: 'Tracking point added successfully',
+    trackingPoint 
+  });
 }));
 
 // POST /api/shipments/:id/pod

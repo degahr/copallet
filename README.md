@@ -49,6 +49,37 @@ A complete freight marketplace platform connecting shippers with carriers for pa
 - **Node.js** 20.19+ or 22.12+ (Vite requirement)
 - **npm** or **yarn** package manager
 
+### Environment Setup
+
+**Option 1: Automatic Setup (Recommended)**
+```bash
+# Run the setup script
+./setup-env.sh        # Linux/Mac
+# or
+setup-env.bat         # Windows
+```
+
+**Option 2: Manual Setup**
+1. **Frontend Environment Variables**
+   ```bash
+   # Copy the example environment file
+   cp env.example .env.local
+   
+   # Edit .env.local and set your API URL
+   VITE_API_URL=http://localhost:3001/api
+   ```
+
+2. **Backend Environment Variables**
+   ```bash
+   # Copy the example environment file
+   cp backend/env.example backend/.env
+   
+   # Edit backend/.env if needed (defaults work for local development)
+   PORT=3001
+   NODE_ENV=development
+   CORS_ORIGIN=http://localhost:5173
+   ```
+
 ### Step 1: Clone and Install Dependencies
 
    ```bash
