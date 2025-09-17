@@ -31,7 +31,7 @@ JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 # CORS Configuration (Update with your frontend URL)
-CORS_ORIGIN=https://your-frontend-app.onrender.com
+CORS_ORIGIN=https://copallet-web.onrender.com
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
@@ -46,7 +46,7 @@ fi
 if [ ! -f ".env" ]; then
     cat > .env << EOF
 # Frontend Environment Configuration
-VITE_API_URL=https://your-backend-app.onrender.com
+VITE_API_URL=https://copallet-w9do.onrender.com
 VITE_APP_NAME=CoPallet
 VITE_APP_VERSION=1.0.0
 EOF

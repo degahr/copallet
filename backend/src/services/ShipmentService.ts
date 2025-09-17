@@ -18,7 +18,14 @@ export class ShipmentService {
     const shipment = createShipment({
       shipperId,
       status: 'draft',
-      ...data,
+      from: data.fromAddress,
+      to: data.toAddress,
+      pickupWindow: data.pickupWindow,
+      deliveryWindow: data.deliveryWindow,
+      pallets: data.pallets,
+      adrRequired: data.adrRequired,
+      constraints: data.constraints,
+      notes: data.notes,
     });
 
     return shipment;
