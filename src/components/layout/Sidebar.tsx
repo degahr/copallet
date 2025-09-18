@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   ];
 
   return (
-    <div className="flex flex-col w-64 bg-white shadow-lg border-r border-gray-200">
+    <div className="flex flex-col h-full w-64 bg-white shadow-lg border-r border-gray-200">
       <div className="flex items-center justify-between h-16 px-4 bg-primary-600">
         <Link to="/app/dashboard" className="flex items-center space-x-2" onClick={onClose}>
           <img 
@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         </button>
       </div>
       
-      <nav className="flex-1 px-4 py-6 space-y-2">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
@@ -105,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 bg-white">
         <div className="flex items-center">
           <div className="flex-shrink-0">
             <div className="h-8 w-8 bg-primary-600 rounded-full flex items-center justify-center">
