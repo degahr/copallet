@@ -17,7 +17,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   phone: string;
-  company: string;
+  companyName: string;
   billingAddress: Address;
   vatNumber?: string;
   defaultPickupContact?: Contact;

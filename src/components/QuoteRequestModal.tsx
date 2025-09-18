@@ -146,28 +146,49 @@ const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
         {/* Progress Steps */}
         <div className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step <= currentStep 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {step}
-                </div>
-                {step < 3 && (
-                  <div className={`w-16 h-1 mx-2 ${
-                    step < currentStep ? 'bg-blue-600' : 'bg-gray-200'
-                  }`} />
-                )}
+          <div className="flex items-center">
+            <div className="flex items-center">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                currentStep >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
+              }`}>
+                <Package className="h-4 w-4" />
               </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-2 text-xs text-gray-600">
-            <span>Shipment Details</span>
-            <span>Budget & Timeline</span>
-            <span>Contact & Message</span>
+              <span className={`ml-2 text-sm font-medium ${
+                currentStep >= 1 ? 'text-primary-600' : 'text-gray-500'
+              }`}>
+                Shipment Details
+              </span>
+            </div>
+            <div className={`flex-1 h-1 mx-4 ${
+              currentStep >= 2 ? 'bg-primary-600' : 'bg-gray-200'
+            }`}></div>
+            <div className="flex items-center">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                currentStep >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
+              }`}>
+                <Euro className="h-4 w-4" />
+              </div>
+              <span className={`ml-2 text-sm font-medium ${
+                currentStep >= 2 ? 'text-primary-600' : 'text-gray-500'
+              }`}>
+                Budget & Timeline
+              </span>
+            </div>
+            <div className={`flex-1 h-1 mx-4 ${
+              currentStep >= 3 ? 'bg-primary-600' : 'bg-gray-200'
+            }`}></div>
+            <div className="flex items-center">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                currentStep >= 3 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
+              }`}>
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <span className={`ml-2 text-sm font-medium ${
+                currentStep >= 3 ? 'text-primary-600' : 'text-gray-500'
+              }`}>
+                Contact & Message
+              </span>
+            </div>
           </div>
         </div>
 

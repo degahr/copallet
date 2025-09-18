@@ -9,7 +9,6 @@ import {
   TrendingUp, 
   Clock, 
   CheckCircle,
-  Truck,
   MapPin,
   Wifi,
   WifiOff,
@@ -291,12 +290,13 @@ const Dashboard: React.FC = () => {
       {/* Welcome Section */}
       <div className="bg-white rounded-lg shadow p-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome to CoPallet
+          Welcome back, {user?.profile?.firstName || 'User'}!
         </h1>
         <p className="text-gray-600">
-          {user?.role === 'shipper' && 'Manage your pallet shipments and connect with reliable carriers.'}
-          {user?.role === 'carrier' && 'Find profitable loads and grow your business.'}
-          {user?.role === 'dispatcher' && 'Coordinate your fleet and optimize operations.'}
+          {user?.role === 'shipper' && `Manage your pallet shipments and connect with reliable carriers for ${user?.profile?.companyName || 'your business'}.`}
+          {user?.role === 'carrier' && `Find profitable loads and grow ${user?.profile?.companyName || 'your transport business'}.`}
+          {user?.role === 'dispatcher' && `Coordinate your fleet and optimize operations for ${user?.profile?.companyName || 'your logistics company'}.`}
+          {user?.role === 'admin' && 'Monitor platform activity and manage the CoPallet ecosystem.'}
         </p>
       </div>
 
