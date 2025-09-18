@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import TrackingWidget from '../components/TrackingWidget';
 import apiService from '../services/api';
 import { 
   Package, 
@@ -338,6 +339,9 @@ const Dashboard: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Live Tracking Widget */}
+      <TrackingWidget shipments={dashboardStats?.shipments || []} />
 
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow p-6">

@@ -28,6 +28,8 @@ export interface Address {
   city: string;
   postalCode: string;
   country: string;
+  latitude?: number;
+  longitude?: number;
   coordinates?: {
     lat: number;
     lng: number;

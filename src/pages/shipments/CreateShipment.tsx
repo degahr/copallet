@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShipment } from '../../contexts/ShipmentContext';
 import { useAuth } from '../../contexts/AuthContext';
+import AddressSearchAdvanced from '../../components/AddressSearchAdvanced';
 import { Shipment, Address, TimeWindow, PalletInfo, ServiceConstraints } from '../../types';
 import { MapPin, Calendar, Package, AlertTriangle, Truck, Clock } from 'lucide-react';
 
@@ -11,6 +12,7 @@ const CreateShipment: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [shipment, setShipment] = useState<Partial<Shipment>>({
     shipperId: user?.id || '',
@@ -55,6 +57,57 @@ const CreateShipment: React.FC = () => {
   });
 
   const [priceGuidance, setPriceGuidance] = useState({ min: 0, max: 0 });
+
+  const validateStep = (stepNumber: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (stepNumber === 1) {
+      // Validate addresses
+      if (!shipment.from?.street || !shipment.from?.city || !shipment.from?.postalCode || !shipment.from?.country) {
+        newErrors.from = 'Please complete the pickup address';
+      }
+      if (!shipment.to?.street || !shipment.to?.city || !shipment.to?.postalCode || !shipment.to?.country) {
+        newErrors.to = 'Please complete the delivery address';
+      }
+      
+      // Validate time windows
+      if (!shipment.pickupWindow?.start || !shipment.pickupWindow?.end) {
+        newErrors.pickupWindow = 'Please set pickup time window';
+      }
+      if (!shipment.deliveryWindow?.start || !shipment.deliveryWindow?.end) {
+        newErrors.deliveryWindow = 'Please set delivery time window';
+      }
+      
+      // Validate pickup is before delivery
+      if (shipment.pickupWindow?.start && shipment.deliveryWindow?.start && 
+          shipment.pickupWindow.start >= shipment.deliveryWindow.start) {
+        newErrors.timeWindow = 'Pickup must be before delivery';
+      }
+    }
+
+    if (stepNumber === 2) {
+      // Validate pallet info
+      if (!shipment.pallets?.quantity || shipment.pallets.quantity < 1) {
+        newErrors.pallets = 'Please specify at least 1 pallet';
+      }
+      if (!shipment.pallets?.weight || shipment.pallets.weight < 1) {
+        newErrors.weight = 'Please specify pallet weight';
+      }
+    }
+
+    if (stepNumber === 3) {
+      // Validate price guidance
+      if (priceGuidance.min <= 0 || priceGuidance.max <= 0) {
+        newErrors.priceGuidance = 'Please set valid price range';
+      }
+      if (priceGuidance.min >= priceGuidance.max) {
+        newErrors.priceGuidance = 'Minimum price must be less than maximum price';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const updateShipment = (field: keyof Shipment, value: unknown) => {
     setShipment(prev => ({
@@ -121,10 +174,28 @@ const CreateShipment: React.FC = () => {
     setLoading(true);
 
     try {
-      await createShipment(shipment as Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>);
+      // Validate all steps before submitting
+      if (!validateStep(1) || !validateStep(2)) {
+        setStep(1); // Go back to first step with errors
+        return;
+      }
+
+      const shipmentToCreate = {
+        fromAddress: shipment.from,
+        toAddress: shipment.to,
+        pickupWindow: shipment.pickupWindow,
+        deliveryWindow: shipment.deliveryWindow,
+        pallets: shipment.pallets,
+        adrRequired: shipment.adrRequired,
+        constraints: shipment.constraints,
+        notes: shipment.notes
+      };
+      
+      await createShipment(shipmentToCreate as Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>);
       navigate('/app/shipments');
     } catch (error) {
       console.error('Failed to create shipment:', error);
+      // You could add a toast notification here
     } finally {
       setLoading(false);
     }
@@ -133,9 +204,21 @@ const CreateShipment: React.FC = () => {
   const handlePostToMarketplace = async () => {
     setLoading(true);
     try {
+      // Validate all steps before posting
+      if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
+        setStep(1); // Go back to first step with errors
+        return;
+      }
+
       const shipmentToPost = {
-        ...shipment,
-        status: 'open' as const,
+        fromAddress: shipment.from,
+        toAddress: shipment.to,
+        pickupWindow: shipment.pickupWindow,
+        deliveryWindow: shipment.deliveryWindow,
+        pallets: shipment.pallets,
+        adrRequired: shipment.adrRequired,
+        constraints: shipment.constraints,
+        notes: shipment.notes,
         priceGuidance: {
           min: priceGuidance.min,
           max: priceGuidance.max,
@@ -147,6 +230,7 @@ const CreateShipment: React.FC = () => {
       navigate('/app/shipments');
     } catch (error) {
       console.error('Failed to post shipment:', error);
+      // You could add a toast notification here
     } finally {
       setLoading(false);
     }
@@ -221,111 +305,51 @@ const CreateShipment: React.FC = () => {
               {/* Pickup Location */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">Pickup Location</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Street Address
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.from?.street}
-                      onChange={(e) => updateAddress('from', 'street', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.from?.city}
-                      onChange={(e) => updateAddress('from', 'city', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Postal Code
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.from?.postalCode}
-                      onChange={(e) => updateAddress('from', 'postalCode', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.from?.country}
-                      onChange={(e) => updateAddress('from', 'country', e.target.value)}
-                    />
-                  </div>
-                </div>
+                <AddressSearchAdvanced
+                  value={{
+                    street: shipment.from?.street || '',
+                    city: shipment.from?.city || '',
+                    postalCode: shipment.from?.postalCode || '',
+                    country: shipment.from?.country || '',
+                    latitude: shipment.from?.latitude,
+                    longitude: shipment.from?.longitude
+                  }}
+                  onChange={(address) => {
+                    updateShipment('from', {
+                      ...shipment.from,
+                      ...address
+                    });
+                  }}
+                  label="Pickup Address"
+                  placeholder="Search for pickup address..."
+                  required
+                  error={errors.from}
+                />
               </div>
 
               {/* Delivery Location */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">Delivery Location</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Street Address
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.to?.street}
-                      onChange={(e) => updateAddress('to', 'street', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.to?.city}
-                      onChange={(e) => updateAddress('to', 'city', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Postal Code
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.to?.postalCode}
-                      onChange={(e) => updateAddress('to', 'postalCode', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.to?.country}
-                      onChange={(e) => updateAddress('to', 'country', e.target.value)}
-                    />
-                  </div>
-                </div>
+                <AddressSearchAdvanced
+                  value={{
+                    street: shipment.to?.street || '',
+                    city: shipment.to?.city || '',
+                    postalCode: shipment.to?.postalCode || '',
+                    country: shipment.to?.country || '',
+                    latitude: shipment.to?.latitude,
+                    longitude: shipment.to?.longitude
+                  }}
+                  onChange={(address) => {
+                    updateShipment('to', {
+                      ...shipment.to,
+                      ...address
+                    });
+                  }}
+                  label="Delivery Address"
+                  placeholder="Search for delivery address..."
+                  required
+                  error={errors.to}
+                />
               </div>
 
               {/* Time Windows */}
@@ -380,10 +404,33 @@ const CreateShipment: React.FC = () => {
                 </div>
               </div>
 
+              {/* Error Display */}
+              {(errors.pickupWindow || errors.deliveryWindow || errors.timeWindow) && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                  <div className="flex">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Please fix the following errors:</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <ul className="list-disc list-inside space-y-1">
+                          {errors.pickupWindow && <li>{errors.pickupWindow}</li>}
+                          {errors.deliveryWindow && <li>{errors.deliveryWindow}</li>}
+                          {errors.timeWindow && <li>{errors.timeWindow}</li>}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
+                  onClick={() => {
+                    if (validateStep(1)) {
+                      setStep(2);
+                    }
+                  }}
                   className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   Next: Cargo Details
@@ -527,7 +574,11 @@ const CreateShipment: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    if (validateStep(2)) {
+                      setStep(3);
+                    }
+                  }}
                   className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   Next: Services & Pricing

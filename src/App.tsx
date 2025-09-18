@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ShipmentProvider } from './contexts/ShipmentContext';
+import { TrackingProvider } from './contexts/TrackingContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
 
@@ -72,7 +73,9 @@ function App() {
             <Route path="/app" element={
               <ProtectedRoute>
                 <ShipmentProvider>
-                  <Layout />
+                  <TrackingProvider>
+                    <Layout />
+                  </TrackingProvider>
                 </ShipmentProvider>
               </ProtectedRoute>
             }>

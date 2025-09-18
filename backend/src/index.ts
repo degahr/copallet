@@ -150,7 +150,9 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     // Initialize database with seed data
+    console.log('Seeding database...');
     await seedDatabase();
+    console.log('Database seeded successfully!');
     
     app.listen(PORT, () => {
       logger.info(`🚀 CoPallet Backend running on port ${PORT}`);
@@ -161,6 +163,7 @@ const startServer = async () => {
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
+    console.error('Server startup error:', error);
     process.exit(1);
   }
 };

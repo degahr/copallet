@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shipment, TrackingPoint } from '../../types';
 import { apiService } from '../../services/api';
+import RouteVisualization from '../../components/RouteVisualization';
 import { 
   MapPin, 
   Clock, 
@@ -53,16 +54,27 @@ const Tracking: React.FC = () => {
     fetchData();
   }, [id]);
 
-  // Real-time tracking simulation
+  // Real-time tracking simulation with realistic route
   useEffect(() => {
     if (isTracking && shipment) {
+      let progress = 0;
+      const totalSteps = 20; // Number of tracking points to simulate
+      
       // Simulate GPS tracking with real API calls
       const interval = setInterval(async () => {
         try {
-          // Mock location updates (in real app, this would be actual GPS)
+          progress += 1;
+          
+          // Calculate position along route (linear interpolation)
+          const fromLat = shipment.from.latitude || 52.3676;
+          const fromLng = shipment.from.longitude || 4.9041;
+          const toLat = shipment.to.latitude || 52.3676;
+          const toLng = shipment.to.longitude || 4.9041;
+          
+          const t = Math.min(progress / totalSteps, 1);
           const mockLocation = {
-            lat: 52.3676 + (Math.random() - 0.5) * 0.01,
-            lng: 4.9041 + (Math.random() - 0.5) * 0.01
+            lat: fromLat + (toLat - fromLat) * t + (Math.random() - 0.5) * 0.005, // Add some noise
+            lng: fromLng + (toLng - fromLng) * t + (Math.random() - 0.5) * 0.005
           };
           
           setCurrentLocation(mockLocation);
@@ -71,27 +83,33 @@ const Tracking: React.FC = () => {
           await apiService.addTrackingPoint(shipment.id, {
             latitude: mockLocation.lat,
             longitude: mockLocation.lng,
-            accuracy: 5,
-            speed: Math.random() * 80 + 20, // Random speed between 20-100 km/h
-            heading: Math.random() * 360 // Random heading
+            accuracy: Math.random() * 10 + 3, // 3-13m accuracy
+            speed: Math.random() * 40 + 50, // 50-90 km/h realistic highway speed
+            heading: Math.random() * 30 + 45 // Mostly eastward direction
           });
 
           // Refresh tracking points
           const trackingResponse = await apiService.getTrackingPoints(shipment.id);
           setTrackingPoints(trackingResponse.trackingPoints || []);
 
-          // Calculate ETA (mock)
-          const remainingDistance = Math.max(0, 150 - trackingPoints.length * 10);
-          const etaMinutes = Math.floor(remainingDistance / 60 * 60); // Assuming 60 km/h
+          // Calculate ETA based on remaining progress
+          const remainingProgress = Math.max(0, totalSteps - progress);
+          const etaMinutes = Math.floor(remainingProgress * 3); // 3 minutes per step
           setEta(`${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}m`);
+          
+          // Stop tracking when route is complete
+          if (progress >= totalSteps) {
+            setIsTracking(false);
+            setEta('Arrived');
+          }
         } catch (err) {
           console.error('Error adding tracking point:', err);
         }
-      }, 10000); // Update every 10 seconds
+      }, 5000); // Update every 5 seconds for more realistic tracking
 
       return () => clearInterval(interval);
     }
-  }, [isTracking, shipment, trackingPoints.length]);
+  }, [isTracking, shipment]);
 
   const startTracking = () => {
     setIsTracking(true);
@@ -233,28 +251,24 @@ const Tracking: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map and Tracking */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Map Placeholder */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <MapPin className="h-5 w-5 mr-2" />
-              Live Map
-            </h2>
-            
-            <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2">Interactive Map</p>
-                <p className="text-sm text-gray-500">
-                  {isTracking ? 'Live tracking active' : 'Start tracking to see live location'}
-                </p>
-                {currentLocation && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Current: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Route Visualization */}
+          <RouteVisualization
+            from={{
+              latitude: shipment.from.latitude || 52.3676,
+              longitude: shipment.from.longitude || 4.9041,
+              city: shipment.from.city,
+              street: shipment.from.street
+            }}
+            to={{
+              latitude: shipment.to.latitude || 52.3676,
+              longitude: shipment.to.longitude || 4.9041,
+              city: shipment.to.city,
+              street: shipment.to.street
+            }}
+            trackingPoints={trackingPoints}
+            currentLocation={currentLocation}
+            isTracking={isTracking}
+          />
 
           {/* Tracking Points */}
           <div className="bg-white rounded-lg shadow p-6">
