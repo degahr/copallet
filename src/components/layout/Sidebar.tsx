@@ -15,12 +15,17 @@ import {
   Calculator,
   Building,
   Users,
-  BookOpen
+  BookOpen,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/logo.png';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const location = useLocation();
   const { user } = useAuth();
 
@@ -60,8 +65,8 @@ const Sidebar: React.FC = () => {
 
   return (
     <div className="flex flex-col w-64 bg-white shadow-lg border-r border-gray-200">
-      <div className="flex items-center justify-center h-16 px-4 bg-primary-600">
-        <Link to="/app/dashboard" className="flex items-center space-x-2">
+      <div className="flex items-center justify-between h-16 px-4 bg-primary-600">
+        <Link to="/app/dashboard" className="flex items-center space-x-2" onClick={onClose}>
           <img 
             src={logo} 
             alt="CoPallet Logo" 
@@ -69,6 +74,14 @@ const Sidebar: React.FC = () => {
           />
           <h1 className="text-xl font-bold text-white">CoPallet</h1>
         </Link>
+        
+        {/* Close button for mobile */}
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1 rounded-md text-white hover:bg-primary-700"
+        >
+          <X className="h-6 w-6" />
+        </button>
       </div>
       
       <nav className="flex-1 px-4 py-6 space-y-2">
@@ -78,6 +91,7 @@ const Sidebar: React.FC = () => {
             <Link
               key={item.name}
               to={item.href}
+              onClick={onClose}
               className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 isActive
                   ? 'bg-primary-100 text-primary-700'

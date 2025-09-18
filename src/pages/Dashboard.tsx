@@ -301,16 +301,16 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {stats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-lg shadow p-6">
+          <div key={stat.name} className="bg-white rounded-lg shadow p-4 sm:p-6">
             <div className="flex items-center">
-              <div className={`p-3 rounded-lg ${stat.color}`}>
-                <stat.icon className="h-6 w-6 text-white" />
+              <div className={`p-2 sm:p-3 rounded-lg ${stat.color}`}>
+                <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600">{stat.name}</p>
+                <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stat.value}</p>
               </div>
             </div>
           </div>
@@ -320,7 +320,7 @@ const Dashboard: React.FC = () => {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickActions.map((action) => (
             <Link
               key={action.title}
