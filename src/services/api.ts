@@ -203,6 +203,28 @@ class ApiService {
     return response.shipments || [];
   }
 
+  async getShipment(id: string): Promise<any> {
+    return this.request<{ shipment: any }>(`/shipments/${id}`);
+  }
+
+  async createShipment(shipmentData: any): Promise<any> {
+    return this.request<{ shipment: any }>('/shipments', {
+      method: 'POST',
+      body: JSON.stringify(shipmentData),
+    });
+  }
+
+  async updateShipment(id: string, shipmentData: any): Promise<any> {
+    return this.request<{ shipment: any }>(`/shipments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(shipmentData),
+    });
+  }
+
+  async deleteShipment(id: string): Promise<void> {
+    await this.request(`/shipments/${id}`, { method: 'DELETE' });
+  }
+
   // Bids
   async getBids(): Promise<any[]> {
     const response = await this.request<{ bids: any[] }>('/shipments/bids');

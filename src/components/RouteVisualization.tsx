@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker } from '
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, Truck, Package, Clock, Navigation } from 'lucide-react';
+import { RouteCalculationService, RouteCalculation } from '../services/routeCalculation';
 
 // Fix for default markers in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -70,39 +71,79 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
   isTracking = false,
   className = ''
 }) => {
-  const [mapCenter, setMapCenter] = useState<[number, number]>([52.3676, 4.9041]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([from.latitude, from.longitude]);
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [mapZoom, setMapZoom] = useState<number>(10);
+  const [routeCalculation, setRouteCalculation] = useState<RouteCalculation | null>(null);
 
-  // Calculate map center and bounds
+  // Calculate realistic route using the RouteCalculationService
   useEffect(() => {
-    const coordinates = [
-      [from.latitude, from.longitude],
-      [to.latitude, to.longitude],
-      ...trackingPoints.map(point => [point.latitude, point.longitude] as [number, number]),
-      ...(currentLocation ? [[currentLocation.lat, currentLocation.lng]] : [])
-    ];
-
-    if (coordinates.length > 0) {
-      const lats = coordinates.map(coord => coord[0]);
-      const lngs = coordinates.map(coord => coord[1]);
+    if (from && to) {
+      const route = RouteCalculationService.calculateRoute(from, to);
+      setRouteCalculation(route);
       
-      const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-      const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+      // Use the calculated waypoints for the route
+      const coordinates = route.waypoints.map(waypoint => [waypoint.lat, waypoint.lng] as [number, number]);
+      setRouteCoordinates(coordinates);
+    }
+  }, [from, to]);
+
+  // Calculate map center and zoom to fit both pickup and delivery points
+  useEffect(() => {
+    if (from && to) {
+      // Calculate bounds to fit both points
+      const lats = [from.latitude, to.latitude];
+      const lngs = [from.longitude, to.longitude];
+      
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      
+      // Center point between pickup and delivery
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      
+      // Calculate distance to determine zoom level
+      const latDiff = maxLat - minLat;
+      const lngDiff = maxLng - minLng;
+      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      
+      // Dynamic zoom based on distance
+      let zoom = 10; // Default zoom
+      if (distance < 0.01) {
+        zoom = 14; // Very close - zoom in
+      } else if (distance < 0.1) {
+        zoom = 12; // Close - medium zoom
+      } else if (distance < 0.5) {
+        zoom = 10; // Medium distance
+      } else if (distance < 1.0) {
+        zoom = 8; // Far - zoom out
+      } else {
+        zoom = 6; // Very far - zoom out more
+      }
       
       setMapCenter([centerLat, centerLng]);
+      setMapZoom(zoom);
     }
-  }, [from, to, trackingPoints, currentLocation]);
+  }, [from, to]);
 
-  // Generate route coordinates (simplified - in real app, use routing service)
+  // Update route coordinates when tracking is active
   useEffect(() => {
-    const route = [
-      [from.latitude, from.longitude],
-      ...trackingPoints.map(point => [point.latitude, point.longitude] as [number, number]),
-      ...(currentLocation ? [[currentLocation.lat, currentLocation.lng]] : []),
-      [to.latitude, to.longitude]
-    ];
-    setRouteCoordinates(route);
-  }, [from, to, trackingPoints, currentLocation]);
+    if (isTracking && trackingPoints.length > 0) {
+      // When tracking is active, show route through tracking points
+      const route = [
+        [from.latitude, from.longitude],
+        ...trackingPoints.map(point => [point.latitude, point.longitude] as [number, number]),
+        [to.latitude, to.longitude]
+      ];
+      setRouteCoordinates(route);
+    } else if (routeCalculation) {
+      // When not tracking, show the calculated route waypoints
+      const coordinates = routeCalculation.waypoints.map(waypoint => [waypoint.lat, waypoint.lng] as [number, number]);
+      setRouteCoordinates(coordinates);
+    }
+  }, [from, to, trackingPoints, isTracking, routeCalculation]);
 
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString('en-US', {
@@ -111,23 +152,10 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
     });
   };
 
-  const getDistance = (point1: [number, number], point2: [number, number]) => {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = (point2[0] - point1[0]) * Math.PI / 180;
-    const dLng = (point2[1] - point1[1]) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(point1[0] * Math.PI / 180) * Math.cos(point2[0] * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const totalDistance = routeCoordinates.length > 1 
-    ? routeCoordinates.reduce((total, point, index) => {
-        if (index === 0) return 0;
-        return total + getDistance(routeCoordinates[index - 1], point);
-      }, 0)
-    : 0;
+  // Use route calculation for distance and duration
+  const totalDistance = routeCalculation?.distance || 0;
+  const totalDuration = routeCalculation?.duration || 0;
+  const routeType = routeCalculation?.routeType || 'road';
 
   return (
     <div className={`bg-white rounded-lg shadow ${className}`}>
@@ -163,13 +191,20 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
         <div className="relative">
           <MapContainer
             center={mapCenter}
-            zoom={8}
-            style={{ height: '400px', width: '100%', borderRadius: '8px' }}
+            zoom={mapZoom}
+            style={{ 
+              height: '400px', 
+              width: '100%', 
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            }}
             className="z-0"
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              subdomains="abcd"
+              maxZoom={20}
             />
 
             {/* Pickup Location */}
@@ -228,14 +263,24 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
               </CircleMarker>
             ))}
 
-            {/* Current Location (if tracking) */}
-            {currentLocation && isTracking && (
-              <Marker position={[currentLocation.lat, currentLocation.lng]} icon={truckIcon}>
+            {/* Current Location Marker (always show if available) */}
+            {currentLocation && (
+              <Marker 
+                position={[currentLocation.lat, currentLocation.lng]} 
+                icon={isTracking ? truckIcon : currentLocationIcon}
+              >
                 <Popup>
                   <div className="text-center">
-                    <div className="font-semibold text-yellow-600 mb-1">Current Location</div>
-                    <div className="text-sm">Live Tracking Active</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-lg font-semibold text-blue-600 mb-1">
+                      {isTracking ? '🚛 Current Location' : '📍 Shipment Location'}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {formatTime(new Date())}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {isTracking ? 'Live tracking active' : 'Waiting for pickup'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
                       {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
                     </div>
                   </div>
@@ -243,15 +288,30 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
               </Marker>
             )}
 
-            {/* Route Line */}
-            {routeCoordinates.length > 1 && (
-              <Polyline
-                positions={routeCoordinates}
-                color="#3B82F6"
-                weight={3}
-                opacity={0.7}
-                dashArray="5, 5"
-              />
+            {/* Route Line - Always show the calculated route */}
+            {routeCoordinates.length > 0 && (
+              <>
+                {/* Route outline for better visibility */}
+                <Polyline
+                  positions={routeCoordinates}
+                  color="white"
+                  weight={8}
+                  opacity={0.8}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+                
+                {/* Main route line */}
+                <Polyline
+                  positions={routeCoordinates}
+                  color={isTracking ? "#2563EB" : "#6B7280"}
+                  weight={isTracking ? 6 : 4}
+                  opacity={isTracking ? 0.9 : 0.7}
+                  dashArray={isTracking ? undefined : "15, 10"}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              </>
             )}
           </MapContainer>
 
@@ -260,7 +320,15 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Distance:</span>
-                <span className="font-medium">{totalDistance.toFixed(1)} km</span>
+                <span className="font-medium">{totalDistance} km</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Duration:</span>
+                <span className="font-medium">{Math.floor(totalDuration / 60)}h {totalDuration % 60}m</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Route:</span>
+                <span className="font-medium capitalize">{routeType}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Points:</span>
@@ -295,8 +363,8 @@ const RouteVisualization: React.FC<RouteVisualizationProps> = ({
               <Navigation className="h-4 w-4 text-blue-600 mr-2" />
               <span className="text-sm font-medium text-gray-900">Route</span>
             </div>
-            <div className="text-sm text-gray-600">{totalDistance.toFixed(1)} km</div>
-            <div className="text-xs text-gray-500">{trackingPoints.length} tracking points</div>
+            <div className="text-sm text-gray-600">{totalDistance} km</div>
+            <div className="text-xs text-gray-500">{Math.floor(totalDuration / 60)}h {totalDuration % 60}m • {routeType}</div>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3">

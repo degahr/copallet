@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import { ShipmentProvider } from './contexts/ShipmentContext';
 import { TrackingProvider } from './contexts/TrackingContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { ErrorProvider, ErrorBoundary } from './contexts/ErrorContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
 
@@ -26,6 +28,7 @@ import Onboarding from './pages/auth/Onboarding';
 import Dashboard from './pages/Dashboard';
 import Shipments from './pages/shipments/Shipments';
 import CreateShipment from './pages/shipments/CreateShipment';
+import EditShipment from './pages/shipments/EditShipment';
 import ShipmentDetail from './pages/shipments/ShipmentDetail';
 import Marketplace from './pages/marketplace/Marketplace';
 import Tracking from './pages/tracking/Tracking';
@@ -51,10 +54,13 @@ import NotFound from './pages/NotFound';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
+    <ErrorBoundary>
+      <ToastProvider>
+        <ErrorProvider>
+          <AuthProvider>
+            <Router>
+              <div className="min-h-screen bg-gray-50">
+                <Routes>
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/about" element={<About />} />
@@ -84,6 +90,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="shipments" element={<Shipments />} />
               <Route path="shipments/create" element={<CreateShipment />} />
+              <Route path="shipments/:id/edit" element={<EditShipment />} />
               <Route path="shipments/:id" element={<ShipmentDetail />} />
               <Route path="marketplace" element={<Marketplace />} />
               <Route path="tracking" element={<Navigate to="/app/dashboard" replace />} />
@@ -113,10 +120,13 @@ function App() {
             
             {/* Catch-all route for public routes */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+                </Routes>
+              </div>
+            </Router>
+          </AuthProvider>
+        </ErrorProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -667,20 +667,16 @@ export const seedDatabase = async () => {
       city: 'Amsterdam',
       postalCode: '1012 AB',
       country: 'Netherlands',
-      coordinates: {
-        lat: 52.3676,
-        lng: 4.9041,
-      },
+      latitude: 52.3676,
+      longitude: 4.9041,
     },
     to: {
       street: '456 Business Ave',
       city: 'Rotterdam',
       postalCode: '3011 AA',
       country: 'Netherlands',
-      coordinates: {
-        lat: 51.9244,
-        lng: 4.4777,
-      },
+      latitude: 51.9244,
+      longitude: 4.4777,
     },
     pickupWindow: {
       start: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
@@ -721,20 +717,16 @@ export const seedDatabase = async () => {
       city: 'Utrecht',
       postalCode: '3511 AB',
       country: 'Netherlands',
-      coordinates: {
-        lat: 52.0907,
-        lng: 5.1214,
-      },
+      latitude: 52.0907,
+      longitude: 5.1214,
     },
     to: {
       street: '321 Warehouse St',
       city: 'Eindhoven',
       postalCode: '5611 AA',
       country: 'Netherlands',
-      coordinates: {
-        lat: 51.4416,
-        lng: 5.4697,
-      },
+      latitude: 51.4416,
+      longitude: 5.4697,
     },
     pickupWindow: {
       start: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Day after tomorrow
@@ -777,20 +769,16 @@ export const seedDatabase = async () => {
       city: 'Hamburg',
       postalCode: '20095',
       country: 'Germany',
-      coordinates: {
-        lat: 53.5511,
-        lng: 9.9937,
-      },
+      latitude: 53.5511,
+      longitude: 9.9937,
     },
     to: {
       street: '888 Distribution Center',
       city: 'Berlin',
       postalCode: '10115',
       country: 'Germany',
-      coordinates: {
-        lat: 52.5200,
-        lng: 13.4050,
-      },
+      latitude: 52.5200,
+      longitude: 13.4050,
     },
     pickupWindow: {
       start: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
@@ -833,20 +821,16 @@ export const seedDatabase = async () => {
       city: 'Antwerp',
       postalCode: '2000',
       country: 'Belgium',
-      coordinates: {
-        lat: 51.2194,
-        lng: 4.4025,
-      },
+      latitude: 51.2194,
+      longitude: 4.4025,
     },
     to: {
       street: '200 Retail Park',
       city: 'Brussels',
       postalCode: '1000',
       country: 'Belgium',
-      coordinates: {
-        lat: 50.8503,
-        lng: 4.3517,
-      },
+      latitude: 50.8503,
+      longitude: 4.3517,
     },
     pickupWindow: {
       start: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
@@ -955,20 +939,16 @@ export const seedDatabase = async () => {
       city: 'Munich',
       postalCode: '80331',
       country: 'Germany',
-      coordinates: {
-        lat: 48.1351,
-        lng: 11.5820,
-      },
+      latitude: 48.1351,
+      longitude: 11.5820,
     },
     to: {
       street: '200 Innovation Hub',
       city: 'Vienna',
       postalCode: '1010',
       country: 'Austria',
-      coordinates: {
-        lat: 48.2082,
-        lng: 16.3738,
-      },
+      latitude: 48.2082,
+      longitude: 16.3738,
     },
     pickupWindow: {
       start: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
@@ -1009,20 +989,16 @@ export const seedDatabase = async () => {
       city: 'Milan',
       postalCode: '20121',
       country: 'Italy',
-      coordinates: {
-        lat: 45.4642,
-        lng: 9.1900,
-      },
+      latitude: 45.4642,
+      longitude: 9.1900,
     },
     to: {
       street: '400 Logistics Center',
       city: 'Zurich',
       postalCode: '8001',
       country: 'Switzerland',
-      coordinates: {
-        lat: 47.3769,
-        lng: 8.5417,
-      },
+      latitude: 47.3769,
+      longitude: 8.5417,
     },
     pickupWindow: {
       start: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
@@ -1237,14 +1213,16 @@ export const seedDatabase = async () => {
       city: 'Amsterdam',
       postalCode: '1012 AB',
       country: 'Netherlands',
-      coordinates: { lat: 52.3676, lng: 4.9041 },
+      latitude: 52.3676,
+      longitude: 4.9041,
     },
     to: {
       street: '456 Business Ave',
       city: 'Rotterdam',
       postalCode: '3011 AA',
       country: 'Netherlands',
-      coordinates: { lat: 51.9244, lng: 4.4777 },
+      latitude: 51.9244,
+      longitude: 4.4777,
     },
     pallets: {
       quantity: 2,
@@ -1268,14 +1246,16 @@ export const seedDatabase = async () => {
       city: 'Utrecht',
       postalCode: '3511 AB',
       country: 'Netherlands',
-      coordinates: { lat: 52.0907, lng: 5.1214 },
+      latitude: 52.0907,
+      longitude: 5.1214,
     },
     to: {
       street: '321 Warehouse St',
       city: 'Eindhoven',
       postalCode: '5611 AA',
       country: 'Netherlands',
-      coordinates: { lat: 51.4416, lng: 5.4697 },
+      latitude: 51.4416,
+      longitude: 5.4697,
     },
     pallets: {
       quantity: 4,

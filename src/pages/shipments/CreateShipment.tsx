@@ -2,14 +2,21 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShipment } from '../../contexts/ShipmentContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useErrorHandler } from '../../contexts/ErrorContext';
+import { useToastHelpers } from '../../contexts/ToastContext';
+import { Input } from '../../components/forms/FormFields';
 import AddressSearchAdvanced from '../../components/AddressSearchAdvanced';
-import { Shipment, Address, TimeWindow, PalletInfo, ServiceConstraints } from '../../types';
-import { MapPin, Calendar, Package, AlertTriangle, Truck, Clock } from 'lucide-react';
+import { RouteCalculationService } from '../../services/routeCalculation';
+import { Shipment, TimeWindow, PalletInfo, ServiceConstraints } from '../../types';
+import { MapPin, Calendar, Package, AlertTriangle, Truck } from 'lucide-react';
 
 const CreateShipment: React.FC = () => {
   const navigate = useNavigate();
   const { createShipment } = useShipment();
   const { user } = useAuth();
+  const { handleError } = useErrorHandler();
+  const { showSuccess } = useToastHelpers();
+  
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -58,6 +65,13 @@ const CreateShipment: React.FC = () => {
 
   const [priceGuidance, setPriceGuidance] = useState({ min: 0, max: 0 });
 
+  // Auto-calculate price when shipment data changes
+  React.useEffect(() => {
+    if (shipment.pallets?.quantity) {
+      calculatePriceGuidance();
+    }
+  }, [shipment.pallets?.quantity, shipment.adrRequired, shipment.constraints]);
+
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -93,6 +107,9 @@ const CreateShipment: React.FC = () => {
       if (!shipment.pallets?.weight || shipment.pallets.weight < 1) {
         newErrors.weight = 'Please specify pallet weight';
       }
+      if (!shipment.pallets?.dimensions?.length || shipment.pallets.dimensions.length < 1) {
+        newErrors.dimensions = 'Please specify pallet dimensions';
+      }
     }
 
     if (stepNumber === 3) {
@@ -114,16 +131,10 @@ const CreateShipment: React.FC = () => {
       ...prev,
       [field]: value
     }));
-  };
-
-  const updateAddress = (type: 'from' | 'to', field: keyof Address, value: string) => {
-    setShipment(prev => ({
-      ...prev,
-      [type]: {
-        ...prev[type]!,
-        [field]: value
-      }
-    }));
+    // Clear error for this field when user starts typing
+    if (errors[field as string]) {
+      setErrors(prev => ({ ...prev, [field as string]: '' }));
+    }
   };
 
   const updateTimeWindow = (type: 'pickupWindow' | 'deliveryWindow', field: keyof TimeWindow, value: Date) => {
@@ -140,7 +151,7 @@ const CreateShipment: React.FC = () => {
     setShipment(prev => ({
       ...prev,
       pallets: {
-        ...(prev.pallets || {}),
+        ...(prev.pallets || { quantity: 1, dimensions: { length: 120, width: 80, height: 144 }, weight: 1000 }),
         [field]: value
       }
     }));
@@ -157,14 +168,39 @@ const CreateShipment: React.FC = () => {
   };
 
   const calculatePriceGuidance = () => {
-    // Simple price calculation based on distance and pallet count
-    // In a real app, this would use historical data and algorithms
-    const basePrice = (shipment.pallets?.quantity || 1) * 50; // €50 per pallet base
-    const distanceMultiplier = 1.2; // Assume some distance calculation
+    if (!shipment.from || !shipment.to || !shipment.from.latitude || !shipment.from.longitude || !shipment.to.latitude || !shipment.to.longitude) {
+      console.log('Cannot calculate price: missing coordinates');
+      return;
+    }
+
+    // Calculate realistic route distance
+    const route = RouteCalculationService.calculateRoute(shipment.from, shipment.to);
+    
+    const palletQuantity = shipment.pallets?.quantity || 1;
+    const basePrice = palletQuantity * 50; // €50 per pallet base
+    const distanceMultiplier = 1 + (route.distance / 1000); // Distance-based pricing
     const urgencyMultiplier = 1.1; // Based on time window
     
-    const min = Math.round(basePrice * distanceMultiplier);
-    const max = Math.round(basePrice * distanceMultiplier * urgencyMultiplier * 1.3);
+    // Add multipliers for special requirements
+    let specialMultiplier = 1.0;
+    if (shipment.adrRequired) specialMultiplier += 0.3; // ADR adds 30%
+    if (shipment.constraints?.tailLiftRequired) specialMultiplier += 0.2; // Tail lift adds 20%
+    if (shipment.constraints?.forkliftRequired) specialMultiplier += 0.15; // Forklift adds 15%
+    if (shipment.constraints?.indoorDelivery) specialMultiplier += 0.1; // Indoor delivery adds 10%
+    if (shipment.constraints?.appointmentRequired) specialMultiplier += 0.05; // Appointment adds 5%
+    
+    const min = Math.round(basePrice * distanceMultiplier * specialMultiplier);
+    const max = Math.round(basePrice * distanceMultiplier * urgencyMultiplier * specialMultiplier * 1.3);
+    
+    console.log('CreateShipment price calculation:', {
+      palletQuantity,
+      basePrice,
+      distance: route.distance,
+      routeType: route.routeType,
+      specialMultiplier,
+      min,
+      max
+    });
     
     setPriceGuidance({ min, max });
   };
@@ -172,6 +208,7 @@ const CreateShipment: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrors({});
 
     try {
       // Validate all steps before submitting
@@ -181,21 +218,22 @@ const CreateShipment: React.FC = () => {
       }
 
       const shipmentToCreate = {
-        fromAddress: shipment.from,
-        toAddress: shipment.to,
-        pickupWindow: shipment.pickupWindow,
-        deliveryWindow: shipment.deliveryWindow,
-        pallets: shipment.pallets,
-        adrRequired: shipment.adrRequired,
+        fromAddress: shipment.from!,
+        toAddress: shipment.to!,
+        pickupWindow: shipment.pickupWindow!,
+        deliveryWindow: shipment.deliveryWindow!,
+        pallets: shipment.pallets!,
+        adrRequired: shipment.adrRequired || false,
         constraints: shipment.constraints,
         notes: shipment.notes
       };
       
-      await createShipment(shipmentToCreate as Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>);
+      await createShipment(shipmentToCreate as any);
+      showSuccess('Shipment Created!', 'Your shipment has been saved as a draft.');
       navigate('/app/shipments');
     } catch (error) {
       console.error('Failed to create shipment:', error);
-      // You could add a toast notification here
+      handleError(error, 'Failed to create shipment');
     } finally {
       setLoading(false);
     }
@@ -203,6 +241,8 @@ const CreateShipment: React.FC = () => {
 
   const handlePostToMarketplace = async () => {
     setLoading(true);
+    setErrors({});
+    
     try {
       // Validate all steps before posting
       if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
@@ -211,12 +251,12 @@ const CreateShipment: React.FC = () => {
       }
 
       const shipmentToPost = {
-        fromAddress: shipment.from,
-        toAddress: shipment.to,
-        pickupWindow: shipment.pickupWindow,
-        deliveryWindow: shipment.deliveryWindow,
-        pallets: shipment.pallets,
-        adrRequired: shipment.adrRequired,
+        fromAddress: shipment.from!,
+        toAddress: shipment.to!,
+        pickupWindow: shipment.pickupWindow!,
+        deliveryWindow: shipment.deliveryWindow!,
+        pallets: shipment.pallets!,
+        adrRequired: shipment.adrRequired || false,
         constraints: shipment.constraints,
         notes: shipment.notes,
         priceGuidance: {
@@ -226,11 +266,12 @@ const CreateShipment: React.FC = () => {
         }
       };
       
-      await createShipment(shipmentToPost as Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>);
+      await createShipment(shipmentToPost as any);
+      showSuccess('Shipment Posted!', 'Your shipment has been posted to the marketplace.');
       navigate('/app/shipments');
     } catch (error) {
       console.error('Failed to post shipment:', error);
-      // You could add a toast notification here
+      handleError(error, 'Failed to post shipment to marketplace');
     } finally {
       setLoading(false);
     }
@@ -247,48 +288,37 @@ const CreateShipment: React.FC = () => {
 
       {/* Progress Steps */}
       <div className="mb-8">
-        <div className="flex items-center">
-          <div className="flex items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              step >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
-            }`}>
-              <MapPin className="h-4 w-4" />
-            </div>
-            <span className={`ml-2 text-sm font-medium ${
-              step >= 1 ? 'text-primary-600' : 'text-gray-500'
-            }`}>
-              Location & Timing
-            </span>
+        <div className="relative">
+          {/* Progress line */}
+          <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200">
+            <div 
+              className="h-0.5 bg-primary-600 transition-all duration-300 ease-in-out"
+              style={{ width: `${((step - 1) / 2) * 100}%` }}
+            />
           </div>
-          <div className={`flex-1 h-1 mx-4 ${
-            step >= 2 ? 'bg-primary-600' : 'bg-gray-200'
-          }`}></div>
-          <div className="flex items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              step >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
-            }`}>
-              <Package className="h-4 w-4" />
-            </div>
-            <span className={`ml-2 text-sm font-medium ${
-              step >= 2 ? 'text-primary-600' : 'text-gray-500'
-            }`}>
-              Cargo Details
-            </span>
-          </div>
-          <div className={`flex-1 h-1 mx-4 ${
-            step >= 3 ? 'bg-primary-600' : 'bg-gray-200'
-          }`}></div>
-          <div className="flex items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              step >= 3 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
-            }`}>
-              <Truck className="h-4 w-4" />
-            </div>
-            <span className={`ml-2 text-sm font-medium ${
-              step >= 3 ? 'text-primary-600' : 'text-gray-500'
-            }`}>
-              Services & Pricing
-            </span>
+          
+          {/* Steps */}
+          <div className="relative flex justify-between">
+            {[
+              { number: 1, title: 'Location & Timing', icon: MapPin },
+              { number: 2, title: 'Cargo Details', icon: Package },
+              { number: 3, title: 'Services & Pricing', icon: Truck }
+            ].map(({ number, title, icon: Icon }) => (
+              <div key={number} className="flex flex-col items-center">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium border-2 transition-all duration-300 ${
+                  step >= number 
+                    ? 'bg-primary-600 text-white border-primary-600' 
+                    : 'bg-white text-gray-600 border-gray-300'
+                }`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span className={`mt-2 text-xs font-medium text-center max-w-20 ${
+                  step >= number ? 'text-primary-600' : 'text-gray-500'
+                }`}>
+                  {title}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -364,19 +394,21 @@ const CreateShipment: React.FC = () => {
                       Pickup Window
                     </label>
                     <div className="mt-1 space-y-2">
-                      <input
+                      <Input
                         type="datetime-local"
                         required
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        label="Start Time"
                         value={shipment.pickupWindow?.start.toISOString().slice(0, 16)}
                         onChange={(e) => updateTimeWindow('pickupWindow', 'start', new Date(e.target.value))}
+                        error={errors.pickupWindow}
                       />
-                      <input
+                      <Input
                         type="datetime-local"
                         required
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        label="End Time"
                         value={shipment.pickupWindow?.end.toISOString().slice(0, 16)}
                         onChange={(e) => updateTimeWindow('pickupWindow', 'end', new Date(e.target.value))}
+                        error={errors.pickupWindow}
                       />
                     </div>
                   </div>
@@ -385,19 +417,21 @@ const CreateShipment: React.FC = () => {
                       Delivery Window
                     </label>
                     <div className="mt-1 space-y-2">
-                      <input
+                      <Input
                         type="datetime-local"
                         required
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        label="Start Time"
                         value={shipment.deliveryWindow?.start.toISOString().slice(0, 16)}
                         onChange={(e) => updateTimeWindow('deliveryWindow', 'start', new Date(e.target.value))}
+                        error={errors.deliveryWindow}
                       />
-                      <input
+                      <Input
                         type="datetime-local"
                         required
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        label="End Time"
                         value={shipment.deliveryWindow?.end.toISOString().slice(0, 16)}
                         onChange={(e) => updateTimeWindow('deliveryWindow', 'end', new Date(e.target.value))}
+                        error={errors.deliveryWindow}
                       />
                     </div>
                   </div>
@@ -449,84 +483,64 @@ const CreateShipment: React.FC = () => {
               {/* Pallet Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">Pallet Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Number of Pallets
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.pallets?.quantity}
-                      onChange={(e) => updatePalletInfo('quantity', parseInt(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Weight (kg)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.pallets?.weight}
-                      onChange={(e) => updatePalletInfo('weight', parseInt(e.target.value))}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    label="Number of Pallets"
+                    value={shipment.pallets?.quantity || ''}
+                    onChange={(e) => updatePalletInfo('quantity', parseInt(e.target.value))}
+                    error={errors.pallets}
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    label="Weight (kg)"
+                    value={shipment.pallets?.weight || ''}
+                    onChange={(e) => updatePalletInfo('weight', parseInt(e.target.value))}
+                    error={errors.weight}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Length (cm)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.pallets?.dimensions.length}
-                      onChange={(e) => updatePalletInfo('dimensions', {
-                        ...shipment.pallets?.dimensions,
-                        length: parseInt(e.target.value)
-                      })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Width (cm)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.pallets?.dimensions.width}
-                      onChange={(e) => updatePalletInfo('dimensions', {
-                        ...shipment.pallets?.dimensions,
-                        width: parseInt(e.target.value)
-                      })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Height (cm)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      value={shipment.pallets?.dimensions.height}
-                      onChange={(e) => updatePalletInfo('dimensions', {
-                        ...shipment.pallets?.dimensions,
-                        height: parseInt(e.target.value)
-                      })}
-                    />
-                  </div>
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    label="Length (cm)"
+                    value={shipment.pallets?.dimensions.length || ''}
+                    onChange={(e) => updatePalletInfo('dimensions', {
+                      ...shipment.pallets?.dimensions,
+                      length: parseInt(e.target.value)
+                    })}
+                    error={errors.dimensions}
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    label="Width (cm)"
+                    value={shipment.pallets?.dimensions.width || ''}
+                    onChange={(e) => updatePalletInfo('dimensions', {
+                      ...shipment.pallets?.dimensions,
+                      width: parseInt(e.target.value)
+                    })}
+                    error={errors.dimensions}
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    label="Height (cm)"
+                    value={shipment.pallets?.dimensions.height || ''}
+                    onChange={(e) => updatePalletInfo('dimensions', {
+                      ...shipment.pallets?.dimensions,
+                      height: parseInt(e.target.value)
+                    })}
+                    error={errors.dimensions}
+                  />
                 </div>
               </div>
 
@@ -667,8 +681,36 @@ const CreateShipment: React.FC = () => {
                     €{priceGuidance.min} - €{priceGuidance.max}
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
-                    Based on {shipment.pallets?.quantity} pallets and route distance
+                    Based on {shipment.pallets?.quantity || 1} pallets and {priceGuidance.min > 0 ? 'calculated route distance' : 'route distance'}
+                    {shipment.adrRequired && <span className="text-red-600"> • ADR Required (+30%)</span>}
+                    {shipment.constraints?.tailLiftRequired && <span className="text-blue-600"> • Tail Lift (+20%)</span>}
+                    {shipment.constraints?.forkliftRequired && <span className="text-purple-600"> • Forklift (+15%)</span>}
+                    {shipment.constraints?.indoorDelivery && <span className="text-green-600"> • Indoor Delivery (+10%)</span>}
+                    {shipment.constraints?.appointmentRequired && <span className="text-orange-600"> • Appointment (+5%)</span>}
                   </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    label="Minimum Price (€)"
+                    value={priceGuidance.min || ''}
+                    onChange={(e) => setPriceGuidance(prev => ({ ...prev, min: parseFloat(e.target.value) || 0 }))}
+                    error={errors.priceGuidance}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    label="Maximum Price (€)"
+                    value={priceGuidance.max || ''}
+                    onChange={(e) => setPriceGuidance(prev => ({ ...prev, max: parseFloat(e.target.value) || 0 }))}
+                    error={errors.priceGuidance}
+                  />
                 </div>
               </div>
 

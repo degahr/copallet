@@ -37,7 +37,13 @@ const Tracking: React.FC = () => {
         
         // Fetch shipment details
         const shipmentResponse = await apiService.getShipment(id);
+        console.log('Shipment response:', shipmentResponse);
         setShipment(shipmentResponse.shipment);
+        
+        // Debug: Log the shipment status
+        if (shipmentResponse.shipment) {
+          console.log('Shipment status:', shipmentResponse.shipment.status);
+        }
         
         // Fetch tracking points
         const trackingResponse = await apiService.getTrackingPoints(id);
@@ -54,9 +60,14 @@ const Tracking: React.FC = () => {
     fetchData();
   }, [id]);
 
-  // Real-time tracking simulation with realistic route
+  // Set up tracking based on shipment status
   useEffect(() => {
-    if (isTracking && shipment) {
+    if (!shipment) return;
+
+    if (shipment.status === 'in-transit') {
+      // Start real-time tracking simulation
+      setIsTracking(true);
+      
       let progress = 0;
       const totalSteps = 20; // Number of tracking points to simulate
       
@@ -108,8 +119,16 @@ const Tracking: React.FC = () => {
       }, 5000); // Update every 5 seconds for more realistic tracking
 
       return () => clearInterval(interval);
+    } else {
+      // For non-in-transit shipments, show stationary tracker at pickup
+      setIsTracking(false);
+      setCurrentLocation({
+        lat: shipment.from.latitude || 52.3676,
+        lng: shipment.from.longitude || 4.9041
+      });
+      setEta('Not started');
     }
-  }, [isTracking, shipment]);
+  }, [shipment]);
 
   const startTracking = () => {
     setIsTracking(true);

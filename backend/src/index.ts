@@ -182,12 +182,14 @@ process.on('SIGINT', async () => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  process.exit(1);
+  console.error('Uncaught Exception:', error);
+  // Don't exit immediately, let the process continue
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit immediately, let the process continue
 });
 
 startServer();

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useShipment } from '../../contexts/ShipmentContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useErrorHandler } from '../../contexts/ErrorContext';
+import { useToastHelpers } from '../../contexts/ToastContext';
+import { Input, Textarea } from '../../components/forms/FormFields';
 import { Shipment, Bid, ROIMetrics, Address } from '../../types';
 import { 
   MapPin, 
@@ -26,6 +29,9 @@ const ShipmentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { shipments, bids, createBid, acceptBid } = useShipment();
   const { user } = useAuth();
+  const { handleError } = useErrorHandler();
+  const { showSuccess } = useToastHelpers();
+  
   const [showBidForm, setShowBidForm] = useState(false);
   const [showROI, setShowROI] = useState(false);
   const [bidForm, setBidForm] = useState({
@@ -33,6 +39,7 @@ const ShipmentDetail: React.FC = () => {
     etaPickup: new Date(),
     message: ''
   });
+  const [bidErrors, setBidErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const shipment = shipments.find(s => s.id === id);
@@ -100,14 +107,46 @@ const ShipmentDetail: React.FC = () => {
     };
   };
 
+  const handleBidFormChange = (field: string, value: string | number | Date) => {
+    setBidForm(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (bidErrors[field]) {
+      setBidErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
   const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setBidErrors({});
 
     try {
+      // Basic validation
+      if (bidForm.price <= 0) {
+        setBidErrors({ price: 'Bid price must be greater than 0' });
+        setLoading(false);
+        return;
+      }
+
+      // Check if ETA is in the future
+      if (bidForm.etaPickup <= new Date()) {
+        setBidErrors({ etaPickup: 'ETA pickup must be in the future' });
+        setLoading(false);
+        return;
+      }
+
+      // Check if ETA is within shipment pickup window
+      if (shipment?.pickupWindow && 
+          (bidForm.etaPickup < shipment.pickupWindow.start || 
+           bidForm.etaPickup > shipment.pickupWindow.end)) {
+        setBidErrors({ etaPickup: 'ETA pickup must be within the shipment pickup window' });
+        setLoading(false);
+        return;
+      }
+
       const roi = calculateROI(bidForm.price);
       await createBid({
-        shipmentId: shipment.id,
+        shipmentId: shipment!.id,
         carrierId: user?.id || '',
         price: bidForm.price,
         etaPickup: bidForm.etaPickup,
@@ -116,10 +155,12 @@ const ShipmentDetail: React.FC = () => {
         roi
       });
       
+      showSuccess('Bid Placed!', 'Your bid has been submitted successfully.');
       setShowBidForm(false);
       setBidForm({ price: 0, etaPickup: new Date(), message: '' });
     } catch (error) {
       console.error('Failed to place bid:', error);
+      handleError(error, 'Failed to place bid');
     } finally {
       setLoading(false);
     }
@@ -445,6 +486,14 @@ const ShipmentDetail: React.FC = () => {
               )}
 
               <Link
+                to={`/app/tracking/${shipment.id}`}
+                className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Route className="h-4 w-4 mr-2" />
+                Track Shipment
+              </Link>
+
+              <Link
                 to={`/app/workflow/${shipment.id}`}
                 className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
@@ -600,45 +649,36 @@ const ShipmentDetail: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">Place Your Bid</h3>
               
               <form onSubmit={handlePlaceBid} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bid Price (€)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    value={bidForm.price}
-                    onChange={(e) => setBidForm(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  required
+                  label="Bid Price (€)"
+                  value={bidForm.price || ''}
+                  onChange={(e) => handleBidFormChange('price', parseFloat(e.target.value) || 0)}
+                  error={bidErrors.price}
+                  helpText="Enter your competitive bid price"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ETA Pickup
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    value={bidForm.etaPickup.toISOString().slice(0, 16)}
-                    onChange={(e) => setBidForm(prev => ({ ...prev, etaPickup: new Date(e.target.value) }))}
-                  />
-                </div>
+                <Input
+                  type="datetime-local"
+                  required
+                  label="ETA Pickup"
+                  value={bidForm.etaPickup.toISOString().slice(0, 16)}
+                  onChange={(e) => handleBidFormChange('etaPickup', new Date(e.target.value))}
+                  error={bidErrors.etaPickup}
+                  helpText="When can you pick up the shipment?"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message (Optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Any additional information..."
-                    value={bidForm.message}
-                    onChange={(e) => setBidForm(prev => ({ ...prev, message: e.target.value }))}
-                  />
-                </div>
+                <Textarea
+                  label="Message (Optional)"
+                  placeholder="Any additional information..."
+                  value={bidForm.message}
+                  onChange={(e) => handleBidFormChange('message', e.target.value)}
+                  error={bidErrors.message}
+                  rows={3}
+                />
 
                 {bidForm.price > 0 && (
                   <div className="bg-gray-50 rounded p-3 text-sm">

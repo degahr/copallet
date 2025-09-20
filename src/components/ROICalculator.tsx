@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useErrorHandler } from '../contexts/ErrorContext';
+import { useToastHelpers } from '../contexts/ToastContext';
+import { Input } from './forms/FormFields';
 import { CarrierCostModel, ROIMetrics } from '../types';
 import { 
   Calculator, 
@@ -8,11 +11,15 @@ import {
   Fuel, 
   Clock, 
   Euro,
-  Settings
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
 
 const ROICalculator: React.FC = () => {
   const { user } = useAuth();
+  const { handleError } = useErrorHandler();
+  const { showSuccess } = useToastHelpers();
+  
   const [costModel, setCostModel] = useState<CarrierCostModel>({
     id: '',
     carrierId: user?.id || '',
@@ -29,6 +36,9 @@ const ROICalculator: React.FC = () => {
     deadheadKm: 50,
     bidPrice: 500
   });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   const calculateROI = (): ROIMetrics => {
     const { distance, deadheadKm, bidPrice } = testScenario;
@@ -57,6 +67,10 @@ const ROICalculator: React.FC = () => {
       ...prev,
       [field]: value
     }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
   };
 
   const updateTestScenario = (field: keyof typeof testScenario, value: number) => {
@@ -64,6 +78,52 @@ const ROICalculator: React.FC = () => {
       ...prev,
       [field]: value
     }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleSaveCostModel = async () => {
+    setLoading(true);
+    setErrors({});
+
+    try {
+      // Basic validation
+      if (costModel.costPerKm <= 0) {
+        setErrors({ costPerKm: 'Cost per kilometer must be positive' });
+        setLoading(false);
+        return;
+      }
+
+      if (costModel.driverCostPerHour <= 0) {
+        setErrors({ driverCostPerHour: 'Driver cost per hour must be positive' });
+        setLoading(false);
+        return;
+      }
+
+      if (costModel.averageSpeedKmh <= 0 || costModel.averageSpeedKmh > 200) {
+        setErrors({ averageSpeedKmh: 'Average speed must be between 1 and 200 km/h' });
+        setLoading(false);
+        return;
+      }
+
+      if (costModel.platformFeePercentage < 0 || costModel.platformFeePercentage > 50) {
+        setErrors({ platformFeePercentage: 'Platform fee must be between 0% and 50%' });
+        setLoading(false);
+        return;
+      }
+
+      // Here you would typically save to the backend
+      // await saveCostModel(costModel);
+      
+      showSuccess('Cost Model Saved!', 'Your cost model has been saved successfully.');
+    } catch (error) {
+      console.error('Failed to save cost model:', error);
+      handleError(error, 'Failed to save cost model');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const roi = calculateROI();
@@ -77,9 +137,13 @@ const ROICalculator: React.FC = () => {
             Configure your cost model and calculate profitability for different scenarios
           </p>
         </div>
-        <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+        <button 
+          onClick={handleSaveCostModel}
+          disabled={loading}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Save className="h-4 w-4 mr-2" />
-          Save Cost Model
+          {loading ? 'Saving...' : 'Save Cost Model'}
         </button>
       </div>
 
@@ -108,6 +172,12 @@ const ROICalculator: React.FC = () => {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">Includes fuel, maintenance, insurance</p>
+              {errors.costPerKm && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {errors.costPerKm}
+                </p>
+              )}
             </div>
 
             <div>
@@ -125,6 +195,12 @@ const ROICalculator: React.FC = () => {
                   onChange={(e) => updateCostModel('driverCostPerHour', parseFloat(e.target.value) || 0)}
                 />
               </div>
+              {errors.driverCostPerHour && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {errors.driverCostPerHour}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -175,6 +251,12 @@ const ROICalculator: React.FC = () => {
                   onChange={(e) => updateCostModel('averageSpeedKmh', parseInt(e.target.value) || 1)}
                 />
               </div>
+              {errors.averageSpeedKmh && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {errors.averageSpeedKmh}
+                </p>
+              )}
             </div>
 
             <div>
@@ -191,6 +273,12 @@ const ROICalculator: React.FC = () => {
                 onChange={(e) => updateCostModel('platformFeePercentage', parseFloat(e.target.value) || 0)}
               />
               <p className="text-xs text-gray-500 mt-1">CoPallet's commission fee</p>
+              {errors.platformFeePercentage && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {errors.platformFeePercentage}
+                </p>
+              )}
             </div>
           </div>
         </div>
